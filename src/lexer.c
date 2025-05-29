@@ -50,28 +50,27 @@ void readUntil(char *buffer, int max_len, const char *ptr, bool (*condition)(cha
     buffer[index] = '\0';
 }
 
-bool isInstruction(const char *str) {
-    if (strcmp(str, "ADD") == 0
-        || strcmp(str, "SUB") == 0
-        || strcmp(str, "MUL") == 0
-        || strcmp(str, "DIV") == 0
-        || strcmp(str, "MOV") == 0
-        || strcmp(str, "JMP") == 0
-        || strcmp(str, "CMP") == 0) {
-        return true;
+Token *reserved_word(Token *cur, const char *ptr) {
+    const char *reserved_words[] = {
+        "HALT", "IN", "OUT"
+    };
+    for (int i = 0; i < sizeof(reserved_words) / sizeof(reserved_words[0]); i++) {
+        if (strncmp(ptr, reserved_words[i], strlen(reserved_words[i])) == 0) {
+            return create_token(cur, HALT + i, reserved_words[i]);
+        }
     }
-    return false;
+    return NULL;
 }
 
-Token *reserved_word(Token *cur, char *ptr) {
-    if (strncmp(ptr, "HALT", 4) == 0) {
-        return create_token(cur, HALT, "HALT");
-    }
-    if (strncmp(ptr, "IN", 2) == 0) {
-        return create_token(cur, IN, "IN");
-    }
-    if (strncmp(ptr, "OUT", 3) == 0) {
-        return create_token(cur, OUT, "OUT");
+Token *instruction(Token *cur, const char *ptr) {
+    const char *instructions[] = {
+        "ADD", "SUB", "MUL", "DIV", "MOV", "CMP", "JMP", "JEQ", "JNE",
+        "JGT", "JLT", "CALL", "RET", "PUSH", "POP"
+    };
+    for (int i = 0; i < sizeof(instructions) / sizeof(instructions[0]); i++) {
+        if (strncmp(ptr, instructions[i], strlen(instructions[i])) == 0) {
+            return create_token(cur, INSTRUCTION, instructions[i]);
+        }
     }
     return NULL;
 }
@@ -130,14 +129,7 @@ Token *lexer(const char *ptr, Token **head, Token *cur) {
             continue;
         }
 
-        if (isInstruction(ptr)) {
-            char buffer[MAX_TOKEN_LEN];
-            readUntil(buffer, MAX_TOKEN_LEN, ptr, is_alpha);
-            cur = create_token(cur, INSTRUCTION, buffer);
-            ptr += strlen(buffer);
-            continue;
-        }
-        
+
         if (is_alpha(*ptr)) {
             Token *reserved = reserved_word(cur, ptr);
             if (reserved) {
@@ -145,6 +137,14 @@ Token *lexer(const char *ptr, Token **head, Token *cur) {
                 ptr += strlen(cur->str);
                 continue;
             }
+
+            Token *inst = instruction(cur, ptr);
+            if (inst) {
+                cur = inst;
+                ptr += strlen(cur->str);
+                continue;
+            }{
+            
             char buffer[MAX_TOKEN_LEN];
             readUntil(buffer, MAX_TOKEN_LEN, ptr, is_alpha);
             cur = create_token(cur, LABEL, buffer);
@@ -154,7 +154,7 @@ Token *lexer(const char *ptr, Token **head, Token *cur) {
 
         fprintf(stderr, "Error: Unrecognized character '%c'\n", *ptr);
         exit(EXIT_FAILURE);
+        }
     }
-
     return cur;
 }

@@ -1,19 +1,36 @@
+#include "assembler.h"
+
 #include <stdio.h>
+#include <stdlib.h>
 
-
-
-void assember(char *file_path) {
-    FILE *f = fopen(file_path, "r");
-    if (f == NULL) {
+Token *_lexer(char *file_path) {
+    FILE *file = fopen(file_path, "r");
+    if (!file) {
         perror("Error opening file");
+        exit(EXIT_FAILURE);
+    }
+
+    char buffer[256];
+    Token *head = NULL;
+    Token *cur = NULL;
+
+    while (fgets(buffer, sizeof(buffer), file)) {
+        cur = lexer(buffer, &head, cur);
+    }
+
+    fclose(file);
+
+    return head;
+}
+
+void assembler(char *file_path) {
+    Token *tokens = _lexer(file_path);
+    if (tokens == NULL) {
+        fprintf(stderr, "No tokens found.\n");
         return;
     }
-    char line[256];
-    while (fgets(line, sizeof(line), f)) {
-        // Process each line of the assembly file
-        // For now, just print it to stdout
-        printf("%s", line);
+
+    for (Token *t = tokens; t != NULL; t = t->next) {
+        printf("Token: Type=%d, Str=%s\n", t->type, t->str);
     }
-    fclose(f);
-    printf("Assembly completed for file: %s\n", file_path);
 }
