@@ -1,0 +1,20 @@
+START:
+    MOV R1, 5          ; Initialize counter to 5
+    MOV R2, 0          ; Initialize sum to 0
+
+LOOP:
+    ADD R2, R9         ; ERROR: R9 is not a valid register
+    SUB R1             ; ERROR: Missing second operand
+    JZ ENDD            ; ERROR: ENDD label does not exist
+    JMP LOOP, R1       ; ERROR: JMP should not have a second operand
+
+END:
+    PUSH R2, R3        ; ERROR: PUSH with two operands not supported
+    CALL PRINT_SM      ; ERROR: PRINT_SM label does not exist
+    HALTT              ; ERROR: Invalid instruction mnemonic
+
+PRINT_SUM:
+    POP                ; ERROR: Missing destination register
+    MOV 0x01, R1       ; ERROR: Invalid operand order
+    OUT R1             ; ERROR: Missing second operand
+    RETURN             ; ERROR: Invalid mnemonic; should be RET

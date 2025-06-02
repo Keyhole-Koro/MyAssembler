@@ -36,5 +36,5 @@ void assembler(char *file_path) {
 
     parser(tokens);
 
-    
+
 }

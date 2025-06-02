@@ -52,7 +52,7 @@ uint8_t mapOpcode(const char *opcode) {
     exit(EXIT_FAILURE);
 }
 
-InstructionList *instrNoOperand(Token **cur, Token *opcode) {
+InstructionList *instrNoOperand(Token *opcode) {
     InstructionList *instrList = malloc(sizeof(InstructionList));
     InstrNoOperand *noOperand = malloc(sizeof(InstrNoOperand));
     noOperand->opcode = mapOpcode(opcode->str);
@@ -61,7 +61,7 @@ InstructionList *instrNoOperand(Token **cur, Token *opcode) {
     return (InstructionList *)instrList;
 }
 
-InstructionList *instrReg(Token **cur, Token *opcode, Token *reg1) {
+InstructionList *instrReg(Token *opcode, Token *reg1) {
     InstructionList *instrList = malloc(sizeof(InstructionList));
     InstrReg *reg = malloc(sizeof(InstrReg));
     reg->opcode = mapOpcode(opcode->str);
@@ -71,7 +71,7 @@ InstructionList *instrReg(Token **cur, Token *opcode, Token *reg1) {
     return (InstructionList *)instrList;
 }
 
-InstructionList *instrRegReg(Token **cur, Token *opcode, Token *reg1, Token *reg2) {
+InstructionList *instrRegReg(Token *opcode, Token *reg1, Token *reg2) {
     InstructionList *instrList = malloc(sizeof(InstructionList));
     InstrRegReg *regReg = malloc(sizeof(InstrRegReg));
     regReg->opcode = mapOpcode(opcode->str);
@@ -82,7 +82,7 @@ InstructionList *instrRegReg(Token **cur, Token *opcode, Token *reg1, Token *reg
     return (InstructionList *)instrList;
 }
 
-InstructionList *instrRegImm21(Token **cur, Token *opcode, Token *reg1, Token *imm21) {
+InstructionList *instrRegImm21(Token *opcode, Token *reg1, Token *imm21) {
     InstructionList *instrList = malloc(sizeof(InstructionList));
     InstrRegImm21 *regImm21 = malloc(sizeof(InstrRegImm21));
     regImm21->opcode = mapOpcode(opcode->str);
@@ -99,12 +99,12 @@ InstructionList *instrRegAppears(Token **cur, Token *opcode, Token *reg1) {
         if ((*cur)->type == REGISTER) {
             Token *reg2 = *cur; // Save the second register
             consume(cur);
-            return instrRegReg(cur, opcode, reg1, reg2);
+            return instrRegReg(opcode, reg1, reg2);
 
         } else if ((*cur)->type == NUMBER) {
             Token *imm21 = *cur; // Save the immediate value
             consume(cur);
-            return instrRegImm21(cur, opcode, reg1, imm21);
+            return instrRegImm21(opcode, reg1, imm21);
         
         
         } else {
@@ -112,12 +112,11 @@ InstructionList *instrRegAppears(Token **cur, Token *opcode, Token *reg1) {
             exit(EXIT_FAILURE);
         }
     } else {
-        return instrReg(cur, opcode, reg1);
+        return instrReg(opcode, reg1);
     }
 }
 
-InstructionList *instrLabel(Token **cur, Token *opcode, Token *label) {
-    printf("InstrLabel %s %s %s\n", opcode->str, label->str);
+InstructionList *instrLabel(Token *opcode, Token *label) {
     InstructionList *instrList = malloc(sizeof(InstructionList));
     InstrLabel *instrlabel = malloc(sizeof(InstrLabel));
     instrlabel->opcode = mapOpcode(opcode->str);
@@ -127,7 +126,7 @@ InstructionList *instrLabel(Token **cur, Token *opcode, Token *label) {
     return (InstructionList *)instrList;
 }
 
-InstructionList *instrImm26(Token **cur, Token *opcode, Token *imm26) {
+InstructionList *instrImm26(Token *opcode, Token *imm26) {
     InstructionList *instrList = malloc(sizeof(InstructionList));
     InstrImm26 *imm26Instr = malloc(sizeof(InstrImm26));
     imm26Instr->opcode = mapOpcode(opcode->str);
@@ -149,7 +148,7 @@ InstructionList *instructions(Token **cur) {
         } else if ((*cur)->type == NUMBER) {
             Token *imm26 = *cur;
             consume(cur);
-            return instrImm26(cur, opcode, imm26);
+            return instrImm26(opcode, imm26);
             
         } else if ((*cur)->type == LABEL
             // Check if the current token is a not label declaration
@@ -158,10 +157,10 @@ InstructionList *instructions(Token **cur) {
 
             Token *label = *cur; // Save the label
             consume(cur);
-            return instrLabel(cur, opcode, label);
+            return instrLabel(opcode, label);
     
         } else {
-            return instrNoOperand(cur, opcode);
+            return instrNoOperand(opcode);
         }
     } else {
         ERROR("Unexpected token type for InstructionList: %d\n", (*cur)->type);
@@ -210,7 +209,7 @@ LabelInstructionLine *parser(Token *head) {
     LabelInstructionLine *new_label = NULL;
     Token **cur = &head;
     while (*cur) {
-        if ((*cur)->type == 0) consume(cur); // Skip EOF token
+        if ((*cur)->type == 0) consume(cur); // Skip
 
         if ((*cur)->type == LABEL) {
             new_label = label(cur);
