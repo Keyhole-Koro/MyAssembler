@@ -2,7 +2,7 @@
 #define LEXER_H
 
 typedef enum {
-    COLON,
+    COLON = 1,
     COMMA,
     PERIOD,
     IDENTIFIER,
@@ -10,9 +10,7 @@ typedef enum {
     REGISTER,
     NUMBER,
     LABEL,
-    HALT,
-    IN,
-    OUT,
+    NEWLINE,
 } TokenType;
 
 typedef struct Token Token;

@@ -4,7 +4,7 @@
 #include "assembler.h"
 
 int main() {
-    const char *file_path = "sample/sample1.masm";
+    const char *file_path = "sample/label.masm";
 
     assembler(file_path);
 

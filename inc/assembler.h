@@ -2,6 +2,7 @@
 #define ASSEMBLER_H
 
 #include "lexer.h"
+#include "parser.h"
 
 void assembler(char *file_path);
 

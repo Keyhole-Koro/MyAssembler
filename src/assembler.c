@@ -33,4 +33,8 @@ void assembler(char *file_path) {
     for (Token *t = tokens; t != NULL; t = t->next) {
         printf("Token: Type=%d, Str=%s\n", t->type, t->str);
     }
+
+    parser(tokens);
+
+    
 }
