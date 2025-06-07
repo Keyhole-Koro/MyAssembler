@@ -3,6 +3,7 @@
 
 #include "lexer.h"
 #include "parser.h"
+#include "codeGen.h"
 
 void assembler(char *file_path);
 

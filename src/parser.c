@@ -15,35 +15,31 @@ void consume(Token **cur) {
 // slow
 uint8_t mapOpcode(const char *opcode) {
     // 📥 Data Movement
-    if (strcmp(opcode, "MOV") == 0)   return 0x00;
-    if (strcmp(opcode, "MOVI") == 0)  return 0x01;
-    if (strcmp(opcode, "LD") == 0)    return 0x02;
-    if (strcmp(opcode, "ST") == 0)    return 0x03;
-
-    // ➕ Arithmetic/Logic
-    if (strcmp(opcode, "ADD") == 0)   return 0x04;
-    if (strcmp(opcode, "SUB") == 0)   return 0x05;
-    if (strcmp(opcode, "CMP") == 0)   return 0x06;
-    if (strcmp(opcode, "AND") == 0)   return 0x07;
-    if (strcmp(opcode, "OR") == 0)    return 0x08;
-    if (strcmp(opcode, "XOR") == 0)   return 0x09;
-    if (strcmp(opcode, "SHL") == 0)   return 0x0A;
-    if (strcmp(opcode, "SHR") == 0)   return 0x0B;
-
-    // 🔁 Control Flow
-    if (strcmp(opcode, "JMP") == 0)   return 0x0C;
-    if (strcmp(opcode, "JZ") == 0)    return 0x0D;
-    if (strcmp(opcode, "JNZ") == 0)   return 0x0E;
-    if (strcmp(opcode, "CALL") == 0)  return 0x0F;
-    if (strcmp(opcode, "RET") == 0)   return 0x10;
-
-    // 📦 Stack
-    if (strcmp(opcode, "PUSH") == 0)  return 0x11;
-    if (strcmp(opcode, "POP") == 0)   return 0x12;
-
-    // 🌐 I/O
-    if (strcmp(opcode, "IN") == 0)    return 0x13;
-    if (strcmp(opcode, "OUT") == 0)   return 0x14;
+    if (strcmp(opcode, "MOV") == 0)   return 0x01;
+    if (strcmp(opcode, "MOVI") == 0)  return 0x02;
+    if (strcmp(opcode, "LD") == 0)    return 0x03;
+    if (strcmp(opcode, "ST") == 0)    return 0x04;
+    
+    if (strcmp(opcode, "ADD") == 0)   return 0x05;
+    if (strcmp(opcode, "SUB") == 0)   return 0x06;
+    if (strcmp(opcode, "CMP") == 0)   return 0x07;
+    if (strcmp(opcode, "AND") == 0)   return 0x08;
+    if (strcmp(opcode, "OR") == 0)    return 0x09;
+    if (strcmp(opcode, "XOR") == 0)   return 0x0A;
+    if (strcmp(opcode, "SHL") == 0)   return 0x0B;
+    if (strcmp(opcode, "SHR") == 0)   return 0x0C;
+    
+    if (strcmp(opcode, "JMP") == 0)   return 0x0D;
+    if (strcmp(opcode, "JZ") == 0)    return 0x0E;
+    if (strcmp(opcode, "JNZ") == 0)   return 0x0F;
+    if (strcmp(opcode, "CALL") == 0)  return 0x10;
+    if (strcmp(opcode, "RET") == 0)   return 0x11;
+    
+    if (strcmp(opcode, "PUSH") == 0)  return 0x12;
+    if (strcmp(opcode, "POP") == 0)   return 0x13;
+    
+    if (strcmp(opcode, "IN") == 0)    return 0x14;
+    if (strcmp(opcode, "OUT") == 0)   return 0x15;
 
     // 🛑 Special
     if (strcmp(opcode, "HALT") == 0)  return 0x1F;
@@ -55,6 +51,7 @@ uint8_t mapOpcode(const char *opcode) {
 InstructionList *instrNoOperand(Token *opcode) {
     InstructionList *instrList = malloc(sizeof(InstructionList));
     InstrNoOperand *noOperand = malloc(sizeof(InstrNoOperand));
+    instrList->kind = INSTR_NO_OPERAND;
     noOperand->opcode = mapOpcode(opcode->str);
     instrList->instruction = (Instruction *)noOperand;
     instrList->needs_fixup = false; // No fixup needed for no operand instructions
@@ -64,6 +61,7 @@ InstructionList *instrNoOperand(Token *opcode) {
 InstructionList *instrReg(Token *opcode, Token *reg1) {
     InstructionList *instrList = malloc(sizeof(InstructionList));
     InstrReg *reg = malloc(sizeof(InstrReg));
+    instrList->kind = INSTR_REG;
     reg->opcode = mapOpcode(opcode->str);
     reg->reg1 = atoi(reg1->str + 1); // Assuming register names are like R0, R1, etc.
     instrList->instruction = (Instruction *)reg;
@@ -74,6 +72,7 @@ InstructionList *instrReg(Token *opcode, Token *reg1) {
 InstructionList *instrRegReg(Token *opcode, Token *reg1, Token *reg2) {
     InstructionList *instrList = malloc(sizeof(InstructionList));
     InstrRegReg *regReg = malloc(sizeof(InstrRegReg));
+    instrList->kind = INSTR_REGREG;
     regReg->opcode = mapOpcode(opcode->str);
     regReg->reg1 = atoi(reg1->str + 1); // Assuming register names are like R0, R1, etc.
     regReg->reg2 = atoi(reg2->str + 1); // Assuming register names are like R0, R1, etc.
@@ -85,6 +84,7 @@ InstructionList *instrRegReg(Token *opcode, Token *reg1, Token *reg2) {
 InstructionList *instrRegImm21(Token *opcode, Token *reg1, Token *imm21) {
     InstructionList *instrList = malloc(sizeof(InstructionList));
     InstrRegImm21 *regImm21 = malloc(sizeof(InstrRegImm21));
+    instrList->kind = INSTR_REGIMM21;
     regImm21->opcode = mapOpcode(opcode->str);
     regImm21->reg1 = atoi(reg1->str + 1); // Assuming register names are like R0, R1, etc.
     regImm21->imm21 = atoi(imm21->str); // Convert immediate value to integer
@@ -119,6 +119,7 @@ InstructionList *instrRegAppears(Token **cur, Token *opcode, Token *reg1) {
 InstructionList *instrLabel(Token *opcode, Token *label) {
     InstructionList *instrList = malloc(sizeof(InstructionList));
     InstrLabel *instrlabel = malloc(sizeof(InstrLabel));
+    instrList->kind = INSTR_LABEL;
     instrlabel->opcode = mapOpcode(opcode->str);
     instrlabel->label = label->str;
     instrList->instruction = (Instruction *)instrlabel;
@@ -129,6 +130,7 @@ InstructionList *instrLabel(Token *opcode, Token *label) {
 InstructionList *instrImm26(Token *opcode, Token *imm26) {
     InstructionList *instrList = malloc(sizeof(InstructionList));
     InstrImm26 *imm26Instr = malloc(sizeof(InstrImm26));
+    instrList->kind = INSTR_IMM26;
     imm26Instr->opcode = mapOpcode(opcode->str);
     imm26Instr->imm26 = atoi(imm26->str); // Convert immediate value to integer
     instrList->instruction = (Instruction *)imm26Instr;
@@ -140,17 +142,17 @@ InstructionList *instructions(Token **cur) {
     if ((*cur)->type == INSTRUCTION) {
         Token *opcode = *cur;
         consume(cur);
-        if ((*cur) == NULL) return NULL; // Handle end of tokens gracefully
-        if ((*cur)->type == REGISTER) {
+        if (*cur && (*cur)->type == REGISTER) {
             Token *reg1 = *cur; // Save the first register
             consume(cur);
             return instrRegAppears(cur, opcode, reg1);
-        } else if ((*cur)->type == NUMBER) {
+        } else if (*cur && (*cur)->type == NUMBER) {
             Token *imm26 = *cur;
             consume(cur);
             return instrImm26(opcode, imm26);
             
-        } else if ((*cur)->type == LABEL
+        } else if (*cur && (*cur)->type == LABEL
+            // messy code
             // Check if the current token is a not label declaration
             && (*cur)->next != NULL
             && (*cur)->next->type != COLON) {
@@ -174,6 +176,7 @@ LabelInstructionLine *label(Token **cur) {
     consume(cur);
     LabelInstructionLine *label_inst_line = malloc(sizeof(LabelInstructionLine));
     label_inst_line->label = label->str; // Store the label string
+    label_inst_line->num_instrucitons = 0; // Initialize the number of instructions to 0
     label_inst_line->inst_list = NULL; // Initialize the list of instructions pointer to NULL
     
     InstructionList *cur_inst = label_inst_line->inst_list;
@@ -185,6 +188,7 @@ LabelInstructionLine *label(Token **cur) {
         while (*cur && (*cur)->type == INSTRUCTION && (*cur)->type != EOF) {
 
             InstructionList *new_inst = instructions(cur);
+            label_inst_line->num_instrucitons++;
             if (label_inst_line->inst_list == NULL) {
                 label_inst_line->inst_list = new_inst;
                 cur_inst = new_inst;

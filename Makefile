@@ -1,7 +1,12 @@
 CC = gcc
 CFLAGS = -Iinc -Wall -Wextra -g
 SRC = $(wildcard src/*.c) $(wildcard src/**/*.c)
+
+# メインファイルだけ除外する
+SRC_NO_MAIN = $(filter-out src/main.c, $(SRC))
 OBJ = $(SRC:.c=.o)
+OBJ_NO_MAIN = $(SRC_NO_MAIN:.c=.o)
+
 TARGET = build/assembler
 
 UNITY_SRC = tests/unity/unity.c
@@ -23,7 +28,8 @@ test: $(TEST_BIN)
 		$$test; \
 	done
 
-build/%: tests/%.c $(UNITY_SRC) $(OBJ)
+# テストバイナリには main.o を含めない
+build/%: tests/%.c $(UNITY_SRC) $(OBJ_NO_MAIN)
 	mkdir -p build
 	$(CC) $(CFLAGS) $^ -o $@
 
@@ -32,9 +38,9 @@ run: $(TARGET)
 
 gdb: $(TARGET)
 	gdb ./$(TARGET)
-	
+
 clean:
 	rm -f $(OBJ) $(TARGET) $(TEST_BIN)
 	rm -rf build
 
-.PHONY: all clean test run debug
+.PHONY: all clean test run gdb
