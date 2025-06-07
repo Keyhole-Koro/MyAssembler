@@ -56,6 +56,15 @@ typedef struct {
     uint8_t opcode;   // 6 bits only
 } InstrNoOperand;
 
+typedef enum {
+    INSTR_REGREG,
+    INSTR_REGIMM21,
+    INSTR_REG,
+    INSTR_LABEL,
+    INSTR_IMM26,
+    INSTR_NO_OPERAND
+} InstructionKind;
+
 // Union that covers all instruction patterns
 typedef union {
     InstructionBase base;
@@ -69,6 +78,8 @@ typedef union {
 
 typedef struct InstructionList InstructionList;
 struct InstructionList {
+    InstructionKind kind;
+
     Instruction *instruction;
     
     // must be replaced/fixed later (e.g., relative address fixup)
@@ -81,6 +92,7 @@ struct InstructionList {
 typedef struct LabelInstructionLine LabelInstructionLine;
 struct LabelInstructionLine {
     char *label; // Empty string if no label
+    int num_instrucitons; // Number of instructions
     InstructionList *inst_list;            // Pointer to encoded instruction data
     LabelInstructionLine *next; // Pointer to the next label instruction line
 };
