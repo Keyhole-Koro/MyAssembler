@@ -134,7 +134,6 @@ uint32_t encodeInstruction(LabelMap *map, InstructionList *inst_list, uint32_t c
         case INSTR_IMM26:
             return encodeImm26(inst->imm26);
         case INSTR_NO_OPERAND:
-            printf("Encoding no operand instruction: %p\n", inst);
             return encodeNoOperand(inst->noOperand);
         // etc.
         default:
@@ -152,7 +151,6 @@ void *codeGen(LabelInstructionLine *head) {
     uint32_t pc = 0;
     for (LabelInstructionLine *line = head; line; line = line->next) {
 
-        printf("Processing label: %s\n", line->label ? line->label : "NULL");
         if (line->label && strlen(line->label) > 0) {
             mapLabelToAddress(&labelMap, line->label, pc);
             pc += (line->num_instrucitons) * sizeof(uint32_t);
@@ -184,8 +182,11 @@ void *codeGen(LabelInstructionLine *head) {
     }
 
     for (size_t i = 0; i < instrCount; i++) {
-        printf("%08X\n", machineCode[i]);
-        printf("opcode: %02X\n", (machineCode[i] >> 26) & 0x3F);
+        printf("----------------------------------\n");
+        printf("machine code: %08X\n", machineCode[i]);
+        printf("opcode: 0x%02X\n", (machineCode[i] >> 26) & 0x3F);
+        print_binary32(machineCode[i]);
+        printf("\n");
     }
 
     // Write to file
