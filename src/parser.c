@@ -19,7 +19,8 @@ uint8_t mapOpcode(const char *opcode) {
     if (strcmp(opcode, "MOVI") == 0)  return 0x02;
     if (strcmp(opcode, "LD") == 0)    return 0x03;
     if (strcmp(opcode, "ST") == 0)    return 0x04;
-    
+
+    // ➕ Arithmetic / Logic
     if (strcmp(opcode, "ADD") == 0)   return 0x05;
     if (strcmp(opcode, "SUB") == 0)   return 0x06;
     if (strcmp(opcode, "CMP") == 0)   return 0x07;
@@ -28,23 +29,24 @@ uint8_t mapOpcode(const char *opcode) {
     if (strcmp(opcode, "XOR") == 0)   return 0x0A;
     if (strcmp(opcode, "SHL") == 0)   return 0x0B;
     if (strcmp(opcode, "SHR") == 0)   return 0x0C;
-    
+
+    // ↺ Control Flow
     if (strcmp(opcode, "JMP") == 0)   return 0x0D;
     if (strcmp(opcode, "JZ") == 0)    return 0x0E;
     if (strcmp(opcode, "JNZ") == 0)   return 0x0F;
-    if (strcmp(opcode, "CALL") == 0)  return 0x10;
-    if (strcmp(opcode, "RET") == 0)   return 0x11;
-    
-    if (strcmp(opcode, "PUSH") == 0)  return 0x12;
-    if (strcmp(opcode, "POP") == 0)   return 0x13;
-    
-    if (strcmp(opcode, "IN") == 0)    return 0x14;
-    if (strcmp(opcode, "OUT") == 0)   return 0x15;
+
+    // 📦 Stack
+    if (strcmp(opcode, "PUSH") == 0)  return 0x11;
+    if (strcmp(opcode, "POP") == 0)   return 0x12;
+
+    // 🌐 I/O
+    if (strcmp(opcode, "IN") == 0)    return 0x13;
+    if (strcmp(opcode, "OUT") == 0)   return 0x14;
 
     // 🛑 Special
-    if (strcmp(opcode, "HALT") == 0)  return 0x1F;
+    if (strcmp(opcode, "HALT") == 0)  return 0x3F;
 
-    ERROR("Unknown opcode: %s\n", opcode);
+    fprintf(stderr, "Unknown opcode: %s\n", opcode);
     exit(EXIT_FAILURE);
 }
 

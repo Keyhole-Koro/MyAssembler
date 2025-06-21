@@ -10,9 +10,9 @@ LOOP:
 
 END:
     PUSH R2            ; Push result onto stack
-    RET               ; Stop execution
+    JMP PRINT_SUM      ; Jump to print handler
 
 PRINT_SUM:
     POP R3             ; Pop sum into R3
     MOV R1, 0x01       ; Dummy instruction to avoid being empty
-    HALT                ; Return from subroutine
+    HALT               ; Stop execution
