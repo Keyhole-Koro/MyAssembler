@@ -7,8 +7,10 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <stdarg.h>
 
 #include "lexer.h"
+#include "utils.h"
 
 #define MAX_LABEL_LEN 32
 

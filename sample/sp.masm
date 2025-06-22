@@ -1,0 +1,3 @@
+__START__:
+    PUSH R1        ; Decrement SP, store R1
+    POP R2         ; Load from SP into R2, increment SP

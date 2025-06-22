@@ -1,4 +1,4 @@
-START:
+__START__:
     MOV R1, 5          ; Initialize counter to 5
     MOV R2, 0          ; Initialize sum to 0
 

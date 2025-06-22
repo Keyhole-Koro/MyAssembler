@@ -28,7 +28,6 @@ test: $(TEST_BIN)
 		$$test; \
 	done
 
-# テストバイナリには main.o を含めない
 build/%: tests/%.c $(UNITY_SRC) $(OBJ_NO_MAIN)
 	mkdir -p build
 	$(CC) $(CFLAGS) $^ -o $@

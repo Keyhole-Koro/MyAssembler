@@ -1,0 +1,2 @@
+__START__:
+    MOV R0, IR     ; Read current instruction (debug/tracing)
