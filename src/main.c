@@ -2,7 +2,7 @@
 
 int main() {
     // Example usage of the assembler
-    char *file_path = "sample/label.masm";
+    char *file_path = "sample/complex.masm";
     assembler(file_path);
 
     // You can add more tests or functionality here

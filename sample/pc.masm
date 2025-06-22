@@ -1,0 +1,17 @@
+__START__:
+    JMP LABEL
+
+LABEL:
+    PUSH BP            ; Save base pointer
+    MOV BP, SP         ; Set base pointer
+    PUSH RETURN_ADDR   ; Manually push return address
+    JMP FUNC           ; Jump to FUNC
+
+RETURN_ADDR:
+    MOV SP, BP         ; Restore stack pointer
+    POP BP             ; Restore base pointer
+    ; Continue from here...
+
+FUNC:
+    POP R4             ; Pop return address into R4
+    JMP R4             ; Return to caller

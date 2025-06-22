@@ -1,0 +1,14 @@
+__START__:
+    CMP R1, R2         ; Compare R1 and R2, update status flags
+    JZ ZERO_LABEL      ; Jump if R1 == R2 (zero flag is set)
+
+    ; Continue normal execution if not equal
+    JMP END            ; (Optional) Skip the ZERO_LABEL block
+
+ZERO_LABEL:
+    ; Code here runs only if R1 == R2
+    ; (For example, set a flag, move a value, etc.)
+    MOV R3, 0xFF       ; Example action
+
+END:
+    HALT               ; End of program

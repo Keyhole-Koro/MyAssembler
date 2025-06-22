@@ -23,6 +23,11 @@ bool is_hex(const char *ptr) {
     // Ensure at least one hex digit follows
     return isxdigit(ptr[2]);
 }
+
+bool is_hex_digit(char c) {
+    return (c >= '0' && c <= '9') || (c >= 'A' && c <= 'F') || (c >= 'a' && c <= 'f');
+}
+
 bool is_alphaOrUnderbar(char c) {
     return is_alpha(c) || c == '_';
 }
@@ -102,6 +107,26 @@ Token *instruction(Token *cur, const char *ptr) {
     return NULL;
 }
 
+//slow
+bool is_register(const char *reg, char *buffer) {
+    const char *registers[] = {
+        "R0", "R1", "R2", "R3", "R4", "R5", "R6", "R7",
+        "PC", "SP", "BP", "SR", "IR"
+    };
+    int count = sizeof(registers) / sizeof(registers[0]);
+
+    for (int i = 0; i < count; i++) {
+        size_t len = strlen(registers[i]);
+        if (strncmp(reg, registers[i], len) == 0) {
+            char next = reg[len];
+            if (next == '\0' || (!isalnum(next) && next != '_')) {
+                strncpy(buffer, registers[i], len + 1);
+                return true;
+            }
+        }
+    }
+    return false;
+}
 
 Token *lexer(const char *ptr, Token **head, Token *cur) {
 
@@ -109,9 +134,11 @@ Token *lexer(const char *ptr, Token **head, Token *cur) {
         *head = (Token *)calloc(1, sizeof(Token));
         cur = *head;
     } 
+
+    char buffer[MAX_TOKEN_LEN];
     
     while (*ptr) {
-        
+        buffer[0] = '\0';  // Reset buffer
         if (isspace(*ptr)) {
             ptr++;
             continue;
@@ -155,10 +182,9 @@ Token *lexer(const char *ptr, Token **head, Token *cur) {
         }
 
         if (is_hex(ptr)) {
-            char buffer[MAX_TOKEN_LEN];
             buffer[0] = '0';
             buffer[1] = 'x';
-            readUntil(buffer + 2, MAX_TOKEN_LEN - 2, ptr + 2, is_number);
+            readUntil(buffer + 2, MAX_TOKEN_LEN - 2, ptr + 2, is_hex_digit);
         
             long value = strtol(buffer, NULL, 16);  // Convert hex string to integer
             
@@ -168,24 +194,19 @@ Token *lexer(const char *ptr, Token **head, Token *cur) {
         }        
 
         if (is_number(*ptr)) {
-            char buffer[MAX_TOKEN_LEN];
             readUntil(buffer, MAX_TOKEN_LEN, ptr, is_number);
             cur = create_token(cur, NUMBER, buffer);
             ptr += strlen(buffer);
             continue;
         } 
 
-        if (*ptr == 'R' && is_number(*(ptr + 1))) {
-            char buffer[MAX_TOKEN_LEN];
-            buffer[0] = 'R';
-            readUntil(buffer + 1, MAX_TOKEN_LEN - 1, ptr + 1, is_number);
+        if (is_register(ptr, buffer)) {
             cur = create_token(cur, REGISTER, buffer);
             ptr += strlen(buffer);
             continue;
         }
 
-
-        if (is_alpha(*ptr)) {
+        if (is_alpha(*ptr) || *ptr == '_') {
 
             Token *inst = instruction(cur, ptr);
             if (inst) {
@@ -194,7 +215,6 @@ Token *lexer(const char *ptr, Token **head, Token *cur) {
                 continue;
             }{
             
-            char buffer[MAX_TOKEN_LEN];
             readUntil(buffer, MAX_TOKEN_LEN, ptr, is_alphaOrUnderbar);
             cur = create_token(cur, LABEL, buffer);
             ptr += strlen(buffer);

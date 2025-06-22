@@ -1,12 +1,30 @@
 #include "parser.h"
 
-#define ERROR(msg, ...) \
-    fprintf(stderr, "Error at %s:%d: " msg "\n", __FILE__, __LINE__, ##__VA_ARGS__), exit(EXIT_FAILURE)
+#define ERROR(cur, msg, ...) \
+    error_with_context(__FILE__, __LINE__, cur, msg, ##__VA_ARGS__)
+
+void error_with_context(const char *file, int line, Token *cur, const char *msg, ...) {
+    fprintf(stderr, "Error at %s:%d: ", file, line);
+
+    va_list args;
+    va_start(args, msg);
+    vfprintf(stderr, msg, args);
+    va_end(args);
+
+    fprintf(stderr, "\nNext tokens:\n");
+    int count = 0;
+    while (cur && count++ < 5) {
+        fprintf(stderr, "  [%d] type=%s, str='%s'\n", count, token_type_to_string(cur->type), cur->str);
+        cur = cur->next;
+    }
+
+    exit(EXIT_FAILURE);
+}
     
 
 void consume(Token **cur) {
     if (*cur == NULL) {
-        ERROR("Unexpected end of tokens");
+        ERROR(*cur, "Unexpected end of tokens");
     }
     Token *next = (*cur)->next;
     *cur = next;
@@ -50,6 +68,26 @@ uint8_t mapOpcode(const char *opcode) {
     exit(EXIT_FAILURE);
 }
 
+uint8_t mapRegister(const char *reg) {
+    if (strcmp(reg, "R0") == 0) return 0x00;
+    if (strcmp(reg, "R1") == 0) return 0x01;
+    if (strcmp(reg, "R2") == 0) return 0x02;
+    if (strcmp(reg, "R3") == 0) return 0x03;
+    if (strcmp(reg, "R4") == 0) return 0x04;
+    if (strcmp(reg, "R5") == 0) return 0x05;
+    if (strcmp(reg, "R6") == 0) return 0x06;
+    if (strcmp(reg, "R7") == 0) return 0x07;
+    if (strcmp(reg, "PC") == 0) return 0x08;
+    if (strcmp(reg, "SP") == 0) return 0x09;
+    if (strcmp(reg, "BP") == 0) return 0x0A;
+    if (strcmp(reg, "SR") == 0) return 0x0B;
+    if (strcmp(reg, "IR") == 0) return 0x0C;
+
+    fprintf(stderr, "Unknown register: %s\n", reg);
+    exit(EXIT_FAILURE);
+}
+
+
 InstructionList *instrNoOperand(Token *opcode) {
     InstructionList *instrList = malloc(sizeof(InstructionList));
     InstrNoOperand *noOperand = malloc(sizeof(InstrNoOperand));
@@ -57,6 +95,7 @@ InstructionList *instrNoOperand(Token *opcode) {
     noOperand->opcode = mapOpcode(opcode->str);
     instrList->instruction = (Instruction *)noOperand;
     instrList->needs_fixup = false; // No fixup needed for no operand instructions
+    instrList->next = NULL; // Initialize next pointer to NULL
     return (InstructionList *)instrList;
 }
 
@@ -65,9 +104,10 @@ InstructionList *instrReg(Token *opcode, Token *reg1) {
     InstrReg *reg = malloc(sizeof(InstrReg));
     instrList->kind = INSTR_REG;
     reg->opcode = mapOpcode(opcode->str);
-    reg->reg1 = atoi(reg1->str + 1); // Assuming register names are like R0, R1, etc.
+    reg->reg1 = mapRegister(reg1->str);
     instrList->instruction = (Instruction *)reg;
     instrList->needs_fixup = false; // No fixup needed for register instructions
+    instrList->next = NULL; // Initialize next pointer to NULL
     return (InstructionList *)instrList;
 }
 
@@ -76,10 +116,11 @@ InstructionList *instrRegReg(Token *opcode, Token *reg1, Token *reg2) {
     InstrRegReg *regReg = malloc(sizeof(InstrRegReg));
     instrList->kind = INSTR_REGREG;
     regReg->opcode = mapOpcode(opcode->str);
-    regReg->reg1 = atoi(reg1->str + 1); // Assuming register names are like R0, R1, etc.
-    regReg->reg2 = atoi(reg2->str + 1); // Assuming register names are like R0, R1, etc.
+    regReg->reg1 = mapRegister(reg1->str);
+    regReg->reg2 = mapRegister(reg2->str);
     instrList->instruction = (Instruction *)regReg;
     instrList->needs_fixup = false; // No fixup needed for register instructions
+    instrList->next = NULL; // Initialize next pointer to NULL
     return (InstructionList *)instrList;
 }
 
@@ -88,15 +129,16 @@ InstructionList *instrRegImm21(Token *opcode, Token *reg1, Token *imm21) {
     InstrRegImm21 *regImm21 = malloc(sizeof(InstrRegImm21));
     instrList->kind = INSTR_REGIMM21;
     regImm21->opcode = mapOpcode(opcode->str);
-    regImm21->reg1 = atoi(reg1->str + 1); // Assuming register names are like R0, R1, etc.
+    regImm21->reg1 = mapRegister(reg1->str);
     regImm21->imm21 = atoi(imm21->str); // Convert immediate value to integer
     instrList->instruction = (Instruction *)regImm21;
     instrList->needs_fixup = false; // No fixup needed for immediate instructions
+    instrList->next = NULL; // Initialize next pointer to NULL
     return (InstructionList *)instrList;
 }
 
 InstructionList *instrRegAppears(Token **cur, Token *opcode, Token *reg1) {
-    if ((*cur)->type == COMMA) {
+    if ((*cur) && (*cur)->type == COMMA) {
         consume(cur);
         if ((*cur)->type == REGISTER) {
             Token *reg2 = *cur; // Save the second register
@@ -110,7 +152,7 @@ InstructionList *instrRegAppears(Token **cur, Token *opcode, Token *reg1) {
         
         
         } else {
-            ERROR("Expected REGISTER or NUMBER after COMMA but found: %s\n", (*cur)->str);
+            ERROR(*cur, "Expected REGISTER or NUMBER after COMMA but found: %s\n", (*cur)->str);
             exit(EXIT_FAILURE);
         }
     } else {
@@ -126,6 +168,7 @@ InstructionList *instrLabel(Token *opcode, Token *label) {
     instrlabel->label = label->str;
     instrList->instruction = (Instruction *)instrlabel;
     instrList->needs_fixup = true; // Fixup needed for label instructions
+    instrList->next = NULL; // Initialize next pointer to NULL
     return (InstructionList *)instrList;
 }
 
@@ -137,6 +180,7 @@ InstructionList *instrImm26(Token *opcode, Token *imm26) {
     imm26Instr->imm26 = atoi(imm26->str); // Convert immediate value to integer
     instrList->instruction = (Instruction *)imm26Instr;
     instrList->needs_fixup = false; // No fixup needed for immediate instructions
+    instrList->next = NULL; // Initialize next pointer to NULL
     return (InstructionList *)instrList;
 }
 
@@ -167,7 +211,7 @@ InstructionList *instructions(Token **cur) {
             return instrNoOperand(opcode);
         }
     } else {
-        ERROR("Unexpected token type for InstructionList: %d\n", (*cur)->type);
+        ERROR(*cur, "Unexpected token type for InstructionList: %s\n", token_type_to_string((*cur)->type));
         exit(EXIT_FAILURE);
     }
     
@@ -180,6 +224,7 @@ LabelInstructionLine *label(Token **cur) {
     label_inst_line->label = label->str; // Store the label string
     label_inst_line->num_instrucitons = 0; // Initialize the number of instructions to 0
     label_inst_line->inst_list = NULL; // Initialize the list of instructions pointer to NULL
+    label_inst_line->next = NULL; // Initialize the next pointer to NULL
     
     InstructionList *cur_inst = label_inst_line->inst_list;
 
@@ -200,7 +245,7 @@ LabelInstructionLine *label(Token **cur) {
             }
         }
     } else {
-        ERROR("Expected ':' after label but found: %s\n", (*cur)->str);
+        ERROR(*cur, "Expected ':' after label but found: %s\n", (*cur)->str);
         exit(EXIT_FAILURE);
     }
 
@@ -224,9 +269,10 @@ LabelInstructionLine *parser(Token *head) {
             new_label = instructions(cur);
             */
         } else {
-            ERROR("Unexpected token type: %d\n", (*cur)->type);
+            ERROR(*cur, "Unexpected token type: %s\n", token_type_to_string((*cur)->type));
             exit(EXIT_FAILURE);
         }
+
         if (head_label_inst_line == NULL) {
             head_label_inst_line = new_label;
             cur_label_inst_line = new_label;
