@@ -57,25 +57,17 @@ int getLabelAddress(LabelMap *map, const char *label, uint32_t *out_address) {
 
 uint32_t encodeRegReg(InstrRegReg instr) {
     assert(instr.reg1 < 32 && instr.reg2 < 32);
-    return ENCODE(instr.opcode, 26) | ENCODE(instr.reg1, 20) | ENCODE(instr.reg2, 0);
+    return ENCODE(instr.opcode, 26) | ENCODE(instr.reg1, 21) | ENCODE(instr.reg2, 16);
 }
 
 uint32_t encodeRegImm21(InstrRegImm21 instr) {
     assert(instr.reg1 < 32 && (instr.imm21 >> 21) == 0);
-    return ENCODE(instr.opcode, 26) | ENCODE(instr.reg1, 20) | ENCODE(instr.imm21 & 0x1FFFFF, 0);
+    return ENCODE(instr.opcode, 26) | ENCODE(instr.reg1, 21) | ENCODE(instr.imm21 & 0x1FFFFF, 0);
 }
 
 uint32_t encodeReg(InstrReg instr) {
     assert(instr.reg1 < 32);
-    return ENCODE(instr.opcode, 26) | ENCODE(instr.reg1, 20);
-}
-
-
-void print_binary32(uint32_t value) {
-    for (int i = 31; i >= 0; --i) {
-        printf("%c", (value >> i) & 1 ? '1' : '0');
-        if (i % 4 == 0 && i != 0) printf(" "); // 4ビット区切り
-    }
+    return ENCODE(instr.opcode, 26) | ENCODE(instr.reg1, 21);
 }
 
 uint32_t substraction_26bit(uint32_t a, uint32_t b) {
@@ -142,7 +134,7 @@ uint32_t encodeInstruction(LabelMap *map, InstructionList *inst_list, uint32_t c
     }
 }
 
-void *codeGen(LabelInstructionLine *head) {
+MachineCode codeGen(LabelInstructionLine *head) {
     LabelMap labelMap;
 
     initLabelMap(&labelMap);
@@ -181,23 +173,6 @@ void *codeGen(LabelInstructionLine *head) {
         }
     }
 
-    for (size_t i = 0; i < instrCount; i++) {
-        printf("----------------------------------\n");
-        printf("machine code: %08X\n", machineCode[i]);
-        printf("opcode: 0x%02X\n", (machineCode[i] >> 26) & 0x3F);
-        print_binary32(machineCode[i]);
-        printf("\n");
-    }
-
-    // Write to file
-    FILE *out = fopen("program.bin", "wb");
-    if (!out) {
-        perror("Failed to open output file");
-        exit(EXIT_FAILURE);
-    }
-
-    fwrite(machineCode, sizeof(uint32_t), instrCount, out);
-    fclose(out);
-    free(machineCode);
-    return NULL;
+    MachineCode result = { .code = machineCode, .size = instrCount };
+    return result;
 }

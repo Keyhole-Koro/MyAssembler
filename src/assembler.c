@@ -23,19 +23,18 @@ Token *_lexer(char *file_path) {
     return head;
 }
 
-void assembler(char *file_path) {
+MachineCode assembler(char *file_path) {
     Token *tokens = _lexer(file_path);
-    if (tokens == NULL) {
+    if (!tokens) {
         fprintf(stderr, "No tokens found.\n");
-        return;
+        return (MachineCode){NULL, 0};
     }
 
     for (Token *t = tokens; t != NULL; t = t->next) {
         printf("Token: Type=%d, Str='%s'\n", t->type, t->str);
     }
-    
+
     LabelInstructionLine *parsed = parser(tokens);
 
-    codeGen(parsed);
-
+    return codeGen(parsed);
 }

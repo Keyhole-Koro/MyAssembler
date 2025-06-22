@@ -14,3 +14,11 @@ const char* token_type_to_string(TokenType type) {
         default:          return "UNKNOWN";
     }
 }
+
+
+void print_binary32(uint32_t value) {
+    for (int i = 31; i >= 0; --i) {
+        printf("%c", (value >> i) & 1 ? '1' : '0');
+        if (i % 4 == 0 && i != 0) printf(" "); // 4ビット区切り
+    }
+}

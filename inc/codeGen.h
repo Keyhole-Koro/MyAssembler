@@ -6,7 +6,13 @@
 
 #include "parser.h"
 #include "lexer.h"
+#include "utils.h"
 
-void *codeGen(LabelInstructionLine *head);
+typedef struct {
+    uint32_t *code;
+    size_t size;
+} MachineCode;
+
+MachineCode codeGen(LabelInstructionLine *head);
 
 #endif
