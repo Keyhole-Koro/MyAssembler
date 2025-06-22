@@ -5,7 +5,7 @@
 #include "parser.h"
 #include "codeGen.h"
 
-void assembler(char *file_path);
+MachineCode assembler(char *file_path);
 
 #endif // ASSEMBLER_H
 

@@ -54,12 +54,12 @@ uint8_t mapOpcode(const char *opcode) {
     if (strcmp(opcode, "JNZ") == 0)   return 0x0F;
 
     // 📦 Stack
-    if (strcmp(opcode, "PUSH") == 0)  return 0x11;
-    if (strcmp(opcode, "POP") == 0)   return 0x12;
+    if (strcmp(opcode, "PUSH") == 0)  return 0x10;
+    if (strcmp(opcode, "POP") == 0)   return 0x11;
 
     // 🌐 I/O
-    if (strcmp(opcode, "IN") == 0)    return 0x13;
-    if (strcmp(opcode, "OUT") == 0)   return 0x14;
+    if (strcmp(opcode, "IN") == 0)    return 0x12;
+    if (strcmp(opcode, "OUT") == 0)   return 0x13;
 
     // 🛑 Special
     if (strcmp(opcode, "HALT") == 0)  return 0x3F;
