@@ -9,6 +9,7 @@ typedef enum {
     INSTRUCTION,
     REGISTER,
     NUMBER,
+    NEGATIVE_NUMBER,
     LABEL,
     NEWLINE,
 } TokenType;

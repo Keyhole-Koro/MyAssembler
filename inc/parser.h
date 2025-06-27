@@ -8,6 +8,8 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdarg.h>
+#include <assert.h>
+#include <errno.h>
 
 #include "lexer.h"
 #include "utils.h"

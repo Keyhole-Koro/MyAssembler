@@ -35,6 +35,7 @@ uint8_t mapOpcode(const char *opcode) {
     // 📥 Data Movement
     if (strcmp(opcode, "MOV") == 0)   return 0x01;
     if (strcmp(opcode, "MOVI") == 0)  return 0x02;
+    if (strcmp(opcode, "MOVIS") == 0)  return 0x18;
     if (strcmp(opcode, "LD") == 0)    return 0x03;
     if (strcmp(opcode, "ST") == 0)    return 0x04;
 
@@ -52,14 +53,18 @@ uint8_t mapOpcode(const char *opcode) {
     if (strcmp(opcode, "JMP") == 0)   return 0x0D;
     if (strcmp(opcode, "JZ") == 0)    return 0x0E;
     if (strcmp(opcode, "JNZ") == 0)   return 0x0F;
+    if (strcmp(opcode, "JG") == 0)   return 0x10;
+    if (strcmp(opcode, "JL") == 0)   return 0x11;
+    if (strcmp(opcode, "JA") == 0)   return 0x12;
+    if (strcmp(opcode, "JB") == 0)   return 0x13;
 
     // 📦 Stack
-    if (strcmp(opcode, "PUSH") == 0)  return 0x10;
-    if (strcmp(opcode, "POP") == 0)   return 0x11;
+    if (strcmp(opcode, "PUSH") == 0)  return 0x14;
+    if (strcmp(opcode, "POP") == 0)   return 0x15;
 
     // 🌐 I/O
-    if (strcmp(opcode, "IN") == 0)    return 0x12;
-    if (strcmp(opcode, "OUT") == 0)   return 0x13;
+    if (strcmp(opcode, "IN") == 0)    return 0x16;
+    if (strcmp(opcode, "OUT") == 0)   return 0x17;
 
     // 🛑 Special
     if (strcmp(opcode, "HALT") == 0)  return 0x3F;
@@ -130,7 +135,16 @@ InstructionList *instrRegImm21(Token *opcode, Token *reg1, Token *imm21) {
     instrList->kind = INSTR_REGIMM21;
     regImm21->opcode = mapOpcode(opcode->str);
     regImm21->reg1 = mapRegister(reg1->str);
-    regImm21->imm21 = atoi(imm21->str); // Convert immediate value to integer
+
+    if (imm21->type == NUMBER) {
+        regImm21->imm21 = atoi(imm21->str); // Convert immediate value to integer
+    }
+    else if (imm21->type == NEGATIVE_NUMBER) {
+        char signStr = imm21->str[0]; // Get the sign
+        assert(signStr == '-'); // Ensure it's a negative number
+        char *numStr = imm21->str + 1; // Skip the sign
+        regImm21->imm21 = (~atoi(numStr) + 1) & 0x1FFFFF; // Convert to negative integer
+    }
     instrList->instruction = (Instruction *)regImm21;
     instrList->needs_fixup = false; // No fixup needed for immediate instructions
     instrList->next = NULL; // Initialize next pointer to NULL
@@ -145,7 +159,7 @@ InstructionList *instrRegAppears(Token **cur, Token *opcode, Token *reg1) {
             consume(cur);
             return instrRegReg(opcode, reg1, reg2);
 
-        } else if ((*cur)->type == NUMBER) {
+        } else if ((*cur)->type == NUMBER || (*cur)->type == NEGATIVE_NUMBER) {
             Token *imm21 = *cur; // Save the immediate value
             consume(cur);
             return instrRegImm21(opcode, reg1, imm21);
@@ -245,7 +259,7 @@ LabelInstructionLine *label(Token **cur) {
             }
         }
     } else {
-        ERROR(*cur, "Expected ':' after label but found: %s\n", (*cur)->str);
+        ERROR(*cur, "Expected ':' after %s but found: %s\n", label->str, (*cur)->str);
         exit(EXIT_FAILURE);
     }
 

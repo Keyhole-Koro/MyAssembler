@@ -77,13 +77,13 @@ void readUntil(char *buffer, int max_len, const char *ptr, bool (*condition)(cha
 Token *instruction(Token *cur, const char *ptr) {
     const char *instructions[] = {
         // 📥 Data Movement
-        "MOV", "MOVI", "LD", "ST",
+        "MOV", "MOVI", "MOVIS", "LD", "ST",
 
         // ➕ Arithmetic/Logic
         "ADD", "SUB", "CMP", "AND", "OR", "XOR", "SHL", "SHR",
 
         // 🔁 Control Flow
-        "JMP", "JZ", "JNZ", "CALL", "RET",
+        "JMP", "JZ", "JNZ", "JG", "JL", "JA", "JB",
 
         // 📦 Stack
         "PUSH", "POP",
@@ -198,7 +198,16 @@ Token *lexer(const char *ptr, Token **head, Token *cur) {
             cur = create_token(cur, NUMBER, buffer);
             ptr += strlen(buffer);
             continue;
-        } 
+        }
+
+        if (*ptr == '-' && is_number(*(ptr + 1))) {
+            readUntil(buffer, MAX_TOKEN_LEN, ptr + 1, is_number);
+            long value = strtol(buffer, NULL, 10);  // Convert string to integer
+            snprintf(buffer, MAX_TOKEN_LEN, "-%ld", value);  // Add negative sign
+            cur = create_token(cur, NEGATIVE_NUMBER, buffer);
+            ptr += strlen(buffer) + 1;  // Move past the number
+            continue;
+        }
 
         if (is_register(ptr, buffer)) {
             cur = create_token(cur, REGISTER, buffer);
