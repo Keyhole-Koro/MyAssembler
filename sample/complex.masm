@@ -1,5 +1,5 @@
 __START__:
-    MOVI R1, 5           ; Initialize counter to 5
+    MOVIS R1, -8000           ; Initialize counter to 5
     MOVI R2, 0           ; Initialize sum to 0
 
 LOOP:
@@ -12,8 +12,11 @@ END:
     PUSH R2             ; Push result onto stack
 
     ; === Begin "PRINT_SUM" subroutine manually ===
-    PUSH BP             ; Save old BPx
+    PUSH R1             ; Save old BPx
     MOV BP, SP          ; Set new base pointer
+
+    MOVI R1, 10
+    SUB R2, R1
 
     POP R3              ; Pop sum into R3
     MOVI R1, 0x01
