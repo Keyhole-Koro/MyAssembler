@@ -31,7 +31,7 @@ MachineCode assembler(char *file_path) {
     }
 
     for (Token *t = tokens; t != NULL; t = t->next) {
-        printf("Token: Type=%d, Str='%s'\n", t->type, t->str);
+        //printf("Token: Type=%d, Str='%s'\n", t->type, t->str);
     }
 
     LabelInstructionLine *parsed = parser(tokens);

@@ -1,0 +1,42 @@
+; ──────────────────────────────────────────────────────────────
+;  Demo: verify that SHL doubles 4 → 8 and SHR halves 16 → 8
+;        Uses unsigned branches JA / JB instead of signed JG / JL
+; ──────────────────────────────────────────────────────────────
+
+__START__:
+    ; --- Test SHL ------------------------------------------------
+    MOVI R1, 4          ; R1 = 4
+    SHL  R1             ; R1 = 8
+
+    MOVI R2, 8
+    CMP  R1, R2         ; unsigned compare 8 ? 8
+
+    JB   MismatchSHL    ; below  → wrong
+    JA   MismatchSHL    ; above  → wrong
+                        ; (equal falls through)
+MatchSHL:
+    ; --- Test SHR ------------------------------------------------
+    MOVI R3, 16         ; R3 = 16
+    SHR  R3             ; R3 = 8
+
+    MOVI R4, 8
+    CMP  R3, R4         ; unsigned compare 8 ? 8
+
+    JB   Failure        ; below  → wrong
+    JA   Failure        ; above  → wrong
+                        ; (equal falls through)
+Success:
+    MOVI R5, 1          ; R5 = 1  (all tests passed)
+    JMP  End
+
+; ──────────────────────────────────────────────────────────────
+MismatchSHL:
+    MOVI R5, 999        ; flag SHL failure
+    JMP  End
+
+Failure:
+    MOVI R5, 888        ; flag SHR failure
+    JMP  End
+
+End:
+    HALT
