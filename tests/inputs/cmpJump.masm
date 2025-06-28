@@ -1,58 +1,58 @@
-__START__:
-    ; Load 4 into R1
-    MOVI R1, 4        ; R1 = 4
+__start__:
+    ; load 4 into r1
+    movi r1, 4        ; r1 = 4
 
-    ; Shift left R1 (now 8)
-    SHL R1            ; R1 = 8
+    ; shift left r1 (now 8)
+    shl r1            ; r1 = 8
 
-    ; Compare R1 to 8
-    MOVI R2, 8        
-    CMP R1, R2        ; Set flags: R1 - R2
+    ; compare r1 to 8
+    movi r2, 8        
+    cmp r1, r2        ; set flags: r1 - r2
 
-    ; If less, it's wrong
-    JL MismatchSHL
+    ; if less, it's wrong
+    jl mismatchshl
 
-    ; If greater, it's also wrong
-    JG MismatchSHL
+    ; if greater, it's also wrong
+    jg mismatchshl
 
-    ; Otherwise, they are equal → jump to match
-    ; (equal case doesn't need a JZ since both JG/JL failed)
-    JMP MatchSHL      
+    ; otherwise, they are equal → jump to match
+    ; (equal case doesn't need a jz since both jg/jl failed)
+    jmp matchshl      
 
-MatchSHL:
-    ; Load 16 into R3
-    MOVI R3, 16       
+matchshl:
+    ; load 16 into r3
+    movi r3, 16       
 
-    ; Shift right R3 (now 8)
-    SHR R3            ; R3 = 8
+    ; shift right r3 (now 8)
+    shr r3            ; r3 = 8
 
-    ; Compare R3 to 8
-    MOVI R4, 8        
-    CMP R3, R4        
+    ; compare r3 to 8
+    movi r4, 8        
+    cmp r3, r4        
 
-    ; If less, fail
-    JL Failure
+    ; if less, fail
+    jl failure
 
-    ; If greater, also fail
-    JG Failure
+    ; if greater, also fail
+    jg failure
 
-    ; Otherwise, it's equal
-    JMP Success
+    ; otherwise, it's equal
+    jmp success
 
-MismatchSHL:
-    ; Fail case for SHL comparison
-    MOVI R5, 999      
-    JMP End           
+mismatchshl:
+    ; fail case for shl comparison
+    movi r5, 999      
+    jmp end           
 
-Failure:
-    ; Fail case for SHR comparison
-    MOVI R5, 888      
-    JMP End           
+failure:
+    ; fail case for shr comparison
+    movi r5, 888      
+    jmp end           
 
-Success:
-    ; Success path
-    MOVI R5, 1        ; R5 = 1 indicates success
+success:
+    ; success path
+    movi r5, 1        ; r5 = 1 indicates success
 
-End:
-    ; Program end point
-    HALT
+end:
+    ; program end point
+    halt

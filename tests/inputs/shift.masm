@@ -1,12 +1,12 @@
-__START__:
-    MOVI R1, 4      
+__start__:
+    movi r1, 4      
 
-    ; SHL R1 => should become 8 (binary: 000...001000)
-    SHL R1          
+    ; shl r1  → should become 8 (binary: 000...001000)
+    shl  r1          
 
-    MOVI R3, 16     
+    movi r3, 16     
 
-    ; SHR R3 => should become 8 (binary: 000...001000)
-    SHR R3          
+    ; shr r3  → should become 8 (binary: 000...001000)
+    shr  r3          
 
-    HALT
+    halt
