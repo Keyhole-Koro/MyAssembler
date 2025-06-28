@@ -2,7 +2,7 @@
 
 int main() {
     // Example usage of the assembler
-    char *file_path = "sample/complex.masm";
+    char *file_path = "tests/inputs/complex.masm";
     MachineCode mc = assembler(file_path);
 
         // Print and write to file
