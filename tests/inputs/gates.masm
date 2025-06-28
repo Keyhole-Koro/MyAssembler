@@ -1,0 +1,81 @@
+; ──────────────────────────────────────────────────────────────
+;  Logic-gate self-test
+;  Verifies:
+;     • ADD  (5 + 7  = 12)
+;     • SUB  (10 – 3 =  7)
+;     • AND  (0xAA & 0xCC = 0x88)
+;     • OR   (0xA0 | 0x0F = 0xAF)
+;     • XOR  (0xF0 ^ 0xAA = 0x5A)
+;  Success  → R5 = 1, HALT
+;  Failure  → R5 = 101-105 (see labels), HALT
+; ──────────────────────────────────────────────────────────────
+
+__START__:
+    ; ---------- ADD test --------------------------------------
+    MOVI R1, 5
+    MOVI R2, 7
+    ADD  R1, R2          ; R1 = 12
+    MOVI R3, 12
+    CMP  R1, R3
+    JNZ  FailADD         ; not equal → error 101
+
+    ; ---------- SUB test --------------------------------------
+    MOVI R1, 10
+    MOVI R2, 3
+    SUB  R1, R2          ; R1 = 7
+    MOVI R3, 7
+    CMP  R1, R3
+    JNZ  FailSUB         ; not equal → error 102
+
+    ; ---------- AND test --------------------------------------
+    MOVI R1, 0xAA        ; 1010 1010b
+    MOVI R2, 0xCC        ; 1100 1100b
+    AND  R1, R2          ; R1 = 0x88
+    MOVI R3, 0x88
+    CMP  R1, R3
+    JNZ  FailAND         ; not equal → error 103
+
+    ; ---------- OR test ---------------------------------------
+    MOVI R1, 0xA0        ; 1010 0000b
+    MOVI R2, 0x0F        ; 0000 1111b
+    OR   R1, R2          ; R1 = 0xAF
+    MOVI R3, 0xAF
+    CMP  R1, R3
+    JNZ  FailOR          ; not equal → error 104
+
+    ; ---------- XOR test --------------------------------------
+    MOVI R1, 0xF0        ; 1111 0000b
+    MOVI R2, 0xAA        ; 1010 1010b
+    XOR  R1, R2          ; R1 = 0x5A
+    MOVI R3, 0x5A
+    CMP  R1, R3
+    JNZ  FailXOR         ; not equal → error 105
+
+    ; ---------- All good --------------------------------------
+Success:
+    MOVI R5, 1
+    JMP  End
+
+; ---------- Failure handlers ----------------------------------
+FailADD:
+    MOVI R5, 101
+    JMP  End
+
+FailSUB:
+    MOVI R5, 102
+    JMP  End
+
+FailAND:
+    MOVI R5, 103
+    JMP  End
+
+FailOR:
+    MOVI R5, 104
+    JMP  End
+
+FailXOR:
+    MOVI R5, 105
+    JMP  End
+
+End:
+    HALT

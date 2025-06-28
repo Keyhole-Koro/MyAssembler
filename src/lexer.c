@@ -32,6 +32,10 @@ bool is_alphaOrUnderbar(char c) {
     return is_alpha(c) || c == '_';
 }
 
+bool is_alphaOrUnderbarOrNumber(char c) {
+    return is_alpha(c) || c == '_' || is_number(c);
+}
+
 bool isTab(char c) {
     return c == '\t';
 }
@@ -224,7 +228,7 @@ Token *lexer(const char *ptr, Token **head, Token *cur) {
                 continue;
             }{
             
-            readUntil(buffer, MAX_TOKEN_LEN, ptr, is_alphaOrUnderbar);
+            readUntil(buffer, MAX_TOKEN_LEN, ptr, is_alphaOrUnderbarOrNumber);
             cur = create_token(cur, LABEL, buffer);
             ptr += strlen(buffer);
             continue;
