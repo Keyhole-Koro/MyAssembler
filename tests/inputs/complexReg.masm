@@ -1,20 +1,20 @@
-__START__:
-    MOVI R0, 10
-    MOVI R1, 20
-    ADD  R0, R1      ; R0 = R0 + R1
+__start__:
+    movi r0, 10
+    movi r1, 20
+    add  r0, r1        ; r0 = r0 + r1
 
-    PUSH R0
-    MOV BP, SP       ; New frame
+    push r0
+    mov  bp, sp        ; new frame
 
-    CMP R0, R1
-    JZ  EQUAL_LABEL
+    cmp  r0, r1
+    jz   equal_label
 
-    MOVI R2, 0xFF
-    POP R3
+    movi r2, 0xff
+    pop  r3
 
-EQUAL_LABEL:
-    MOV R4, BP
-    MOV R5, SP
-    MOV R6, PC
-    MOV R7, IR
-    HALT
+equal_label:
+    mov  r4, bp
+    mov  r5, sp
+    mov  r6, pc
+    mov  r7, ir
+    halt

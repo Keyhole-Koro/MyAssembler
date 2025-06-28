@@ -1,81 +1,81 @@
 ; ──────────────────────────────────────────────────────────────
-;  Logic-gate self-test
-;  Verifies:
-;     • ADD  (5 + 7  = 12)
-;     • SUB  (10 – 3 =  7)
-;     • AND  (0xAA & 0xCC = 0x88)
-;     • OR   (0xA0 | 0x0F = 0xAF)
-;     • XOR  (0xF0 ^ 0xAA = 0x5A)
-;  Success  → R5 = 1, HALT
-;  Failure  → R5 = 101-105 (see labels), HALT
+;  logic-gate self-test
+;  verifies:
+;     • add  (5 + 7  = 12)
+;     • sub  (10 – 3 =  7)
+;     • and  (0xaa & 0xcc = 0x88)
+;     • or   (0xa0 | 0x0f = 0xaf)
+;     • xor  (0xf0 ^ 0xaa = 0x5a)
+;  success  → r5 = 1, halt
+;  failure  → r5 = 101-105 (see labels), halt
 ; ──────────────────────────────────────────────────────────────
 
-__START__:
-    ; ---------- ADD test --------------------------------------
-    MOVI R1, 5
-    MOVI R2, 7
-    ADD  R1, R2          ; R1 = 12
-    MOVI R3, 12
-    CMP  R1, R3
-    JNZ  FailADD         ; not equal → error 101
+__start__:
+    ; ---------- add test --------------------------------------
+    movi r1, 5
+    movi r2, 7
+    add  r1, r2          ; r1 = 12
+    movi r3, 12
+    cmp  r1, r3
+    jnz  failadd         ; not equal → error 101
 
-    ; ---------- SUB test --------------------------------------
-    MOVI R1, 10
-    MOVI R2, 3
-    SUB  R1, R2          ; R1 = 7
-    MOVI R3, 7
-    CMP  R1, R3
-    JNZ  FailSUB         ; not equal → error 102
+    ; ---------- sub test --------------------------------------
+    movi r1, 10
+    movi r2, 3
+    sub  r1, r2          ; r1 = 7
+    movi r3, 7
+    cmp  r1, r3
+    jnz  failsub         ; not equal → error 102
 
-    ; ---------- AND test --------------------------------------
-    MOVI R1, 0xAA        ; 1010 1010b
-    MOVI R2, 0xCC        ; 1100 1100b
-    AND  R1, R2          ; R1 = 0x88
-    MOVI R3, 0x88
-    CMP  R1, R3
-    JNZ  FailAND         ; not equal → error 103
+    ; ---------- and test --------------------------------------
+    movi r1, 0xaa        ; 1010 1010b
+    movi r2, 0xcc        ; 1100 1100b
+    and  r1, r2          ; r1 = 0x88
+    movi r3, 0x88
+    cmp  r1, r3
+    jnz  failand         ; not equal → error 103
 
-    ; ---------- OR test ---------------------------------------
-    MOVI R1, 0xA0        ; 1010 0000b
-    MOVI R2, 0x0F        ; 0000 1111b
-    OR   R1, R2          ; R1 = 0xAF
-    MOVI R3, 0xAF
-    CMP  R1, R3
-    JNZ  FailOR          ; not equal → error 104
+    ; ---------- or test ---------------------------------------
+    movi r1, 0xa0        ; 1010 0000b
+    movi r2, 0x0f        ; 0000 1111b
+    or   r1, r2          ; r1 = 0xaf
+    movi r3, 0xaf
+    cmp  r1, r3
+    jnz  failor          ; not equal → error 104
 
-    ; ---------- XOR test --------------------------------------
-    MOVI R1, 0xF0        ; 1111 0000b
-    MOVI R2, 0xAA        ; 1010 1010b
-    XOR  R1, R2          ; R1 = 0x5A
-    MOVI R3, 0x5A
-    CMP  R1, R3
-    JNZ  FailXOR         ; not equal → error 105
+    ; ---------- xor test --------------------------------------
+    movi r1, 0xf0        ; 1111 0000b
+    movi r2, 0xaa        ; 1010 1010b
+    xor  r1, r2          ; r1 = 0x5a
+    movi r3, 0x5a
+    cmp  r1, r3
+    jnz  failxor         ; not equal → error 105
 
-    ; ---------- All good --------------------------------------
-Success:
-    MOVI R5, 1
-    JMP  End
+    ; ---------- all good --------------------------------------
+success:
+    movi r5, 1
+    jmp  end
 
-; ---------- Failure handlers ----------------------------------
-FailADD:
-    MOVI R5, 101
-    JMP  End
+; ---------- failure handlers ----------------------------------
+failadd:
+    movi r5, 101
+    jmp  end
 
-FailSUB:
-    MOVI R5, 102
-    JMP  End
+failsub:
+    movi r5, 102
+    jmp  end
 
-FailAND:
-    MOVI R5, 103
-    JMP  End
+failand:
+    movi r5, 103
+    jmp  end
 
-FailOR:
-    MOVI R5, 104
-    JMP  End
+failor:
+    movi r5, 104
+    jmp  end
 
-FailXOR:
-    MOVI R5, 105
-    JMP  End
+failxor:
+    movi r5, 105
+    jmp  end
 
-End:
-    HALT
+end:
+    halt

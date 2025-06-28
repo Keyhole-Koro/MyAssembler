@@ -33,60 +33,60 @@ void consume(Token **cur) {
 // slow
 uint8_t mapOpcode(const char *opcode) {
     // 📥 Data Movement
-    if (strcmp(opcode, "MOV") == 0)   return 0x01;
-    if (strcmp(opcode, "MOVI") == 0)  return 0x02;
-    if (strcmp(opcode, "MOVIS") == 0)  return 0x18;
-    if (strcmp(opcode, "LD") == 0)    return 0x03;
-    if (strcmp(opcode, "ST") == 0)    return 0x04;
+    if (strcmp(opcode, "mov") == 0)   return 0x01;
+    if (strcmp(opcode, "movi") == 0)  return 0x02;
+    if (strcmp(opcode, "movis") == 0)  return 0x18;
+    if (strcmp(opcode, "load") == 0)    return 0x03;
+    if (strcmp(opcode, "store") == 0)    return 0x04;
 
     // ➕ Arithmetic / Logic
-    if (strcmp(opcode, "ADD") == 0)   return 0x05;
-    if (strcmp(opcode, "SUB") == 0)   return 0x06;
-    if (strcmp(opcode, "CMP") == 0)   return 0x07;
-    if (strcmp(opcode, "AND") == 0)   return 0x08;
-    if (strcmp(opcode, "OR") == 0)    return 0x09;
-    if (strcmp(opcode, "XOR") == 0)   return 0x0A;
-    if (strcmp(opcode, "SHL") == 0)   return 0x0B;
-    if (strcmp(opcode, "SHR") == 0)   return 0x0C;
+    if (strcmp(opcode, "add") == 0)   return 0x05;
+    if (strcmp(opcode, "sub") == 0)   return 0x06;
+    if (strcmp(opcode, "cmp") == 0)   return 0x07;
+    if (strcmp(opcode, "and") == 0)   return 0x08;
+    if (strcmp(opcode, "or") == 0)    return 0x09;
+    if (strcmp(opcode, "xor") == 0)   return 0x0A;
+    if (strcmp(opcode, "shl") == 0)   return 0x0B;
+    if (strcmp(opcode, "shr") == 0)   return 0x0C;
 
     // ↺ Control Flow
-    if (strcmp(opcode, "JMP") == 0)   return 0x0D;
-    if (strcmp(opcode, "JZ") == 0)    return 0x0E;
-    if (strcmp(opcode, "JNZ") == 0)   return 0x0F;
-    if (strcmp(opcode, "JG") == 0)   return 0x10;
-    if (strcmp(opcode, "JL") == 0)   return 0x11;
-    if (strcmp(opcode, "JA") == 0)   return 0x12;
-    if (strcmp(opcode, "JB") == 0)   return 0x13;
+    if (strcmp(opcode, "jmp") == 0)   return 0x0D;
+    if (strcmp(opcode, "jz") == 0)    return 0x0E;
+    if (strcmp(opcode, "jnz") == 0)   return 0x0F;
+    if (strcmp(opcode, "jg") == 0)   return 0x10;
+    if (strcmp(opcode, "jl") == 0)   return 0x11;
+    if (strcmp(opcode, "ja") == 0)   return 0x12;
+    if (strcmp(opcode, "jb") == 0)   return 0x13;
 
     // 📦 Stack
-    if (strcmp(opcode, "PUSH") == 0)  return 0x14;
-    if (strcmp(opcode, "POP") == 0)   return 0x15;
+    if (strcmp(opcode, "push") == 0)  return 0x14;
+    if (strcmp(opcode, "pop") == 0)   return 0x15;
 
     // 🌐 I/O
-    if (strcmp(opcode, "IN") == 0)    return 0x16;
-    if (strcmp(opcode, "OUT") == 0)   return 0x17;
+    if (strcmp(opcode, "in") == 0)    return 0x16;
+    if (strcmp(opcode, "out") == 0)   return 0x17;
 
     // 🛑 Special
-    if (strcmp(opcode, "HALT") == 0)  return 0x3F;
+    if (strcmp(opcode, "halt") == 0)  return 0x3F;
 
     fprintf(stderr, "Unknown opcode: %s\n", opcode);
     exit(EXIT_FAILURE);
 }
 
 uint8_t mapRegister(const char *reg) {
-    if (strcmp(reg, "R0") == 0) return 0x00;
-    if (strcmp(reg, "R1") == 0) return 0x01;
-    if (strcmp(reg, "R2") == 0) return 0x02;
-    if (strcmp(reg, "R3") == 0) return 0x03;
-    if (strcmp(reg, "R4") == 0) return 0x04;
-    if (strcmp(reg, "R5") == 0) return 0x05;
-    if (strcmp(reg, "R6") == 0) return 0x06;
-    if (strcmp(reg, "R7") == 0) return 0x07;
-    if (strcmp(reg, "PC") == 0) return 0x08;
-    if (strcmp(reg, "SP") == 0) return 0x09;
-    if (strcmp(reg, "BP") == 0) return 0x0A;
-    if (strcmp(reg, "SR") == 0) return 0x0B;
-    if (strcmp(reg, "IR") == 0) return 0x0C;
+    if (strcmp(reg, "r0") == 0) return 0x00;
+    if (strcmp(reg, "r1") == 0) return 0x01;
+    if (strcmp(reg, "r2") == 0) return 0x02;
+    if (strcmp(reg, "r3") == 0) return 0x03;
+    if (strcmp(reg, "r4") == 0) return 0x04;
+    if (strcmp(reg, "r5") == 0) return 0x05;
+    if (strcmp(reg, "r6") == 0) return 0x06;
+    if (strcmp(reg, "r7") == 0) return 0x07;
+    if (strcmp(reg, "pc") == 0) return 0x08;
+    if (strcmp(reg, "sp") == 0) return 0x09;
+    if (strcmp(reg, "bp") == 0) return 0x0A;
+    if (strcmp(reg, "sr") == 0) return 0x0B;
+    if (strcmp(reg, "ir") == 0) return 0x0C;
 
     fprintf(stderr, "Unknown register: %s\n", reg);
     exit(EXIT_FAILURE);

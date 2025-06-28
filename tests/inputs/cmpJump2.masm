@@ -1,42 +1,44 @@
 ; ──────────────────────────────────────────────────────────────
-;  Demo: verify that SHL doubles 4 → 8 and SHR halves 16 → 8
-;        Uses unsigned branches JA / JB instead of signed JG / JL
+;  demo: verify that shl doubles 4 → 8 and shr halves 16 → 8
+;        uses unsigned branches ja / jb instead of signed jg / jl
 ; ──────────────────────────────────────────────────────────────
 
-__START__:
-    ; --- Test SHL ------------------------------------------------
-    MOVI R1, 4          ; R1 = 4
-    SHL  R1             ; R1 = 8
+__start__:
+    ; --- test shl ------------------------------------------------
+    movi r1, 4          ; r1 = 4
+    shl  r1             ; r1 = 8
 
-    MOVI R2, 8
-    CMP  R1, R2         ; unsigned compare 8 ? 8
+    movi r2, 8
+    cmp  r1, r2         ; unsigned compare 8 ? 8
 
-    JB   MismatchSHL    ; below  → wrong
-    JA   MismatchSHL    ; above  → wrong
+    jb   mismatchshl    ; below  → wrong
+    ja   mismatchshl    ; above  → wrong
                         ; (equal falls through)
-MatchSHL:
-    ; --- Test SHR ------------------------------------------------
-    MOVI R3, 16         ; R3 = 16
-    SHR  R3             ; R3 = 8
 
-    MOVI R4, 8
-    CMP  R3, R4         ; unsigned compare 8 ? 8
+matchshl:
+    ; --- test shr ------------------------------------------------
+    movi r3, 16         ; r3 = 16
+    shr  r3             ; r3 = 8
 
-    JB   Failure        ; below  → wrong
-    JA   Failure        ; above  → wrong
+    movi r4, 8
+    cmp  r3, r4         ; unsigned compare 8 ? 8
+
+    jb   failure        ; below  → wrong
+    ja   failure        ; above  → wrong
                         ; (equal falls through)
-Success:
-    MOVI R5, 1          ; R5 = 1  (all tests passed)
-    JMP  End
+
+success:
+    movi r5, 1          ; r5 = 1  (all tests passed)
+    jmp  end
 
 ; ──────────────────────────────────────────────────────────────
-MismatchSHL:
-    MOVI R5, 999        ; flag SHL failure
-    JMP  End
+mismatchshl:
+    movi r5, 999        ; flag shl failure
+    jmp  end
 
-Failure:
-    MOVI R5, 888        ; flag SHR failure
-    JMP  End
+failure:
+    movi r5, 888        ; flag shr failure
+    jmp  end
 
-End:
-    HALT
+end:
+    halt

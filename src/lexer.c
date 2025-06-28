@@ -81,22 +81,22 @@ void readUntil(char *buffer, int max_len, const char *ptr, bool (*condition)(cha
 Token *instruction(Token *cur, const char *ptr) {
     const char *instructions[] = {
         // 📥 Data Movement
-        "MOV", "MOVI", "MOVIS", "LD", "ST",
+        "mov", "movi", "movis", "load", "store",
 
         // ➕ Arithmetic/Logic
-        "ADD", "SUB", "CMP", "AND", "OR", "XOR", "SHL", "SHR",
+        "add", "sub", "cmp", "and", "or", "xor", "shl", "shr",
 
         // 🔁 Control Flow
-        "JMP", "JZ", "JNZ", "JG", "JL", "JA", "JB",
+        "jmp", "jz", "jnz", "jg", "jl", "ja", "jb",
 
         // 📦 Stack
-        "PUSH", "POP",
+        "push", "pop",
 
         // 🌐 I/O
-        "IN", "OUT",
+        "in", "out",
 
         // 🛑 Special
-        "HALT"
+        "halt"
     };
 
     for (int i = 0; i < sizeof(instructions) / sizeof(instructions[0]); i++) {
@@ -114,8 +114,8 @@ Token *instruction(Token *cur, const char *ptr) {
 //slow
 bool is_register(const char *reg, char *buffer) {
     const char *registers[] = {
-        "R0", "R1", "R2", "R3", "R4", "R5", "R6", "R7",
-        "PC", "SP", "BP", "SR", "IR"
+        "r0", "r1", "r2", "r3", "r4", "r5", "r6", "r7",
+        "pc", "sp", "bp", "sr", "ir"
     };
     int count = sizeof(registers) / sizeof(registers[0]);
 
