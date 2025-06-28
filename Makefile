@@ -1,8 +1,7 @@
 CC = gcc
-CFLAGS = -Iinc -Wall -Wextra -g
+CFLAGS = -Iinc -Wall -Wextra -g -fPIE
 SRC = $(wildcard src/*.c) $(wildcard src/**/*.c)
 
-# メインファイルだけ除外する
 SRC_NO_MAIN = $(filter-out src/main.c, $(SRC))
 OBJ = $(SRC:.c=.o)
 OBJ_NO_MAIN = $(SRC_NO_MAIN:.c=.o)
