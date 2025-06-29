@@ -84,10 +84,10 @@ Token *instruction(Token *cur, const char *ptr) {
         "mov", "movi", "movis", "load", "store",
 
         // ➕ Arithmetic/Logic
-        "add", "sub", "cmp", "and", "or", "xor", "shl", "shr",
+        "add", "addis", "sub", "cmp", "and", "or", "xor", "shl", "shr",
 
         // 🔁 Control Flow
-        "jmp", "jz", "jnz", "jg", "jl", "ja", "jb",
+        "jmp", "jz", "jnz", "jg", "jl", "ja", "jb", "call", "ret",
 
         // 📦 Stack
         "push", "pop",
@@ -115,7 +115,7 @@ Token *instruction(Token *cur, const char *ptr) {
 bool is_register(const char *reg, char *buffer) {
     const char *registers[] = {
         "r0", "r1", "r2", "r3", "r4", "r5", "r6", "r7",
-        "pc", "sp", "bp", "sr", "ir"
+        "pc", "sp", "bp", "sr", "lr"
     };
     int count = sizeof(registers) / sizeof(registers[0]);
 

@@ -1,3 +1,0 @@
-__START__:
-    MOV R1, BP     ; Copy BP to R1
-    MOV BP, SP     ; Start new stack frame

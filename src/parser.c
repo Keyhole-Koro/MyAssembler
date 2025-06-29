@@ -41,6 +41,7 @@ uint8_t mapOpcode(const char *opcode) {
 
     // ➕ Arithmetic / Logic
     if (strcmp(opcode, "add") == 0)   return 0x05;
+    if (strcmp(opcode, "addis") == 0)   return 0x19;
     if (strcmp(opcode, "sub") == 0)   return 0x06;
     if (strcmp(opcode, "cmp") == 0)   return 0x07;
     if (strcmp(opcode, "and") == 0)   return 0x08;
@@ -57,6 +58,9 @@ uint8_t mapOpcode(const char *opcode) {
     if (strcmp(opcode, "jl") == 0)   return 0x11;
     if (strcmp(opcode, "ja") == 0)   return 0x12;
     if (strcmp(opcode, "jb") == 0)   return 0x13;
+    if (strcmp(opcode, "call") == 0)   return 0x19;
+    if (strcmp(opcode, "ret") == 0)   return 0x1a;
+
 
     // 📦 Stack
     if (strcmp(opcode, "push") == 0)  return 0x14;
@@ -86,7 +90,7 @@ uint8_t mapRegister(const char *reg) {
     if (strcmp(reg, "sp") == 0) return 0x09;
     if (strcmp(reg, "bp") == 0) return 0x0A;
     if (strcmp(reg, "sr") == 0) return 0x0B;
-    if (strcmp(reg, "ir") == 0) return 0x0C;
+    if (strcmp(reg, "lr") == 0) return 0x0C;
 
     fprintf(stderr, "Unknown register: %s\n", reg);
     exit(EXIT_FAILURE);

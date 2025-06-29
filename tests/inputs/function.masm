@@ -1,0 +1,81 @@
+__START__:
+
+  ; --- prologue --------------------------------------------------
+  push bp                      ; save previous base pointer
+  mov  bp, sp                  ; establish new base pointer
+
+  mov  r4, bp                  ; copy base pointer to r4
+
+  movi  r1, 9                ; load constant 9
+
+  ; define variable 'x'
+  mov  r2, bp
+  addis r2, -4
+  store r2, r1
+  ; --- call function 'add' ----------------------------------
+
+  ; expression: variable 'x'
+  mov   r1, bp                      ; load base pointer
+  addis  r1, -4                      ; offset for 'x'
+  load  r1, r1                      ; load value of 'x'
+  mov r1, r1           ; move argument into r1
+
+  movi  r1, 1                ; load constant 1
+  mov r2, r1           ; move argument into r2
+
+  jmp add_f                     ; call function 'add'
+
+  ; define variable 'y'
+  mov  r2, bp
+  addis r2, -8
+  store r2, r1
+  movi  r1, 0                ; load constant 0
+
+  ; --- return ------------------------------------------------------
+
+  ; --- program end --------------------------------------------
+  halt                            ; stop execution
+
+
+add_f:
+
+  ; --- prologue --------------------------------------------------
+  push bp                      ; save previous base pointer
+  mov  bp, sp                  ; establish new base pointer
+
+  mov  r4, bp                  ; copy base pointer to r4
+
+  ; --- store parameter 'a' (arg0) ------------------
+
+  mov   r2, r1           ; move argument 'a'
+  movis   r0, 4                               ; load base pointer
+  sub   r4, r0                                ; compute address bp - 4
+  store r4, r2                                ; store 'a' at [bp - 4]
+
+  ; --- store parameter 'b' (arg1) ------------------
+
+  mov   r2, r2           ; move argument 'b'
+  movis   r0, 8                               ; load base pointer
+  sub   r4, r0                                ; compute address bp - 8
+  store r4, r2                                ; store 'b' at [bp - 8]
+
+
+  ; expression: variable 'a'
+  mov   r1, bp                      ; load base pointer
+  addis  r1, -4                      ; offset for 'a'
+  load  r1, r1                      ; load value of 'a'
+  push r1                            ; save left operand
+
+
+  ; expression: variable 'b'
+  mov   r1, bp                      ; load base pointer
+  addis  r1, -8                      ; offset for 'b'
+  load  r1, r1                      ; load value of 'b'
+  pop  r2                            ; restore left operand
+  add  r1, r2                        ; add r1 + r2
+
+  ; --- return ------------------------------------------------------
+
+  ; --- epilogue --------------------------------------------------
+  pop  bp                      ; restore previous base pointer
+  mov  pc, lr                  ; return to caller
