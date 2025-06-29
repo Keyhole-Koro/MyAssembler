@@ -4,6 +4,7 @@
 #include "lexer.h"
 #include "parser.h"
 #include "codeGen.h"
+#include "utils.h"
 
 MachineCode assembler(char *file_path);
 

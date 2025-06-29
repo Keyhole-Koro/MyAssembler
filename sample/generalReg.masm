@@ -1,6 +1,0 @@
-__START__:
-    MOV R0, R1     ; Move value from R1 to R0
-    ADD R2, R3     ; Add R3 to R2
-    SUB R4, R5     ; Subtract R5 from R4
-    XOR R6, R6     ; Clear R6 (XOR with itself)
-    MOVI R7, 42    ; Load immediate value 42 into R7

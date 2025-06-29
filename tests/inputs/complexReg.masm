@@ -16,5 +16,5 @@ equal_label:
     mov  r4, bp
     mov  r5, sp
     mov  r6, pc
-    mov  r7, ir
+    mov  r7, lr
     halt
