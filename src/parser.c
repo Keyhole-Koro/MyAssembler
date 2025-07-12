@@ -58,8 +58,7 @@ uint8_t mapOpcode(const char *opcode) {
     if (strcmp(opcode, "jl") == 0)   return 0x11;
     if (strcmp(opcode, "ja") == 0)   return 0x12;
     if (strcmp(opcode, "jb") == 0)   return 0x13;
-    if (strcmp(opcode, "call") == 0)   return 0x19;
-    if (strcmp(opcode, "ret") == 0)   return 0x1a;
+    if (strcmp(opcode, "call") == 0)   return 0x1b;
 
 
     // 📦 Stack
@@ -72,6 +71,8 @@ uint8_t mapOpcode(const char *opcode) {
 
     // 🛑 Special
     if (strcmp(opcode, "halt") == 0)  return 0x3F;
+
+    if (strcmp(opcode, "debug") == 0) return 0x1A;
 
     fprintf(stderr, "Unknown opcode: %s\n", opcode);
     exit(EXIT_FAILURE);

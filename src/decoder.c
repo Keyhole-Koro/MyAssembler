@@ -28,7 +28,7 @@ OpcodeEntry opcode_table[] = {
 };
 
 uint8_t get_opcode(const char* mnemonic) {
-    for (int i = 0; i < sizeof(opcode_table) / sizeof(opcode_table[0]); i++) {
+    for (long unsigned int i = 0; i < sizeof(opcode_table) / sizeof(opcode_table[0]); i++) {
         if (strcmp(opcode_table[i].name, mnemonic) == 0) {
             return opcode_table[i].opcode;
     }

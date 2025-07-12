@@ -3,7 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-Token *_lexer(char *file_path) {
+Token *_lexer(const char *file_path) {
     FILE *file = fopen(file_path, "r");
     if (!file) {
         perror("Error opening file");
@@ -23,7 +23,7 @@ Token *_lexer(char *file_path) {
     return head;
 }
 
-MachineCode assembler(char *file_path) {
+MachineCode assembler(const char *file_path) {
     Token *tokens = _lexer(file_path);
     if (!tokens) {
         fprintf(stderr, "No tokens found.\n");
@@ -31,7 +31,7 @@ MachineCode assembler(char *file_path) {
     }
 
     for (Token *t = tokens; t != NULL; t = t->next) {
-        //printf("Token: Type=%s, Str='%s'\n", token_type_to_string(t->type), t->str);
+        printf("Token: Type=%s, Str='%s'\n", token_type_to_string(t->type), t->str);
     }
 
     LabelInstructionLine *parsed = parser(tokens);

@@ -31,8 +31,8 @@ build/%: tests/%.c $(UNITY_SRC) $(OBJ_NO_MAIN)
 	mkdir -p build
 	$(CC) $(CFLAGS) $^ -o $@
 
-run: $(TARGET)
-	./$(TARGET)
+run-myas: $(TARGET)
+	./$(TARGET) $(IN) $(OUT)
 
 gdb: $(TARGET)
 	gdb ./$(TARGET)

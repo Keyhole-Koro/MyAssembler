@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
+#include <stdbool.h>
 
 #define MAX_TOKEN_LEN 20
 
@@ -80,6 +81,8 @@ void readUntil(char *buffer, int max_len, const char *ptr, bool (*condition)(cha
 // slow
 Token *instruction(Token *cur, const char *ptr) {
     const char *instructions[] = {
+        "debug",
+
         // 📥 Data Movement
         "mov", "movi", "movis", "load", "store",
 
@@ -96,10 +99,11 @@ Token *instruction(Token *cur, const char *ptr) {
         "in", "out",
 
         // 🛑 Special
-        "halt"
+        "halt",
+
     };
 
-    for (int i = 0; i < sizeof(instructions) / sizeof(instructions[0]); i++) {
+    for (long unsigned int i = 0; i < sizeof(instructions) / sizeof(instructions[0]); i++) {
         size_t len = strlen(instructions[i]);
         if (strncmp(ptr, instructions[i], len) == 0) {
             char next = ptr[len];

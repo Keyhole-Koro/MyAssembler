@@ -6,7 +6,7 @@
 #include "codeGen.h"
 #include "utils.h"
 
-MachineCode assembler(char *file_path);
+MachineCode assembler(const char *file_path);
 
 #endif // ASSEMBLER_H
 
