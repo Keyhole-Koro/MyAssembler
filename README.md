@@ -17,3 +17,8 @@ This will process the assembly file and generate the corresponding machine code.
 
 ## Architecture Specification
 The assembler adheres to the architecture defined in `include/architecture_spec.h`. This file contains the necessary constants, structures, and function prototypes to ensure compliance with the architecture.
+
+
+when updating instruction sets
+check `lexer` `parser`
+id integrate them for maintainabililty later

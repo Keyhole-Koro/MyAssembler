@@ -1,29 +1,29 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <stdint.h>
+
 #include "assembler.h"
 
-int main() {
-    // Example usage of the assembler
-    char *file_path = "tests/inputs/complex.masm";
-    MachineCode mc = assembler(file_path);
+int main(int argc, char *argv[]) {
+    if (argc < 3) {
+        fprintf(stderr, "Usage: %s <input.asm> <output.bin>\n", argv[0]);
+        return 1;
+    }
+    const char *asm_path = argv[1];
+    const char *bin_path = argv[2];
 
-        // Print and write to file
-        for (size_t i = 0; i < mc.size; i++) {
-            printf("----------------------------------\n");
-            printf("machine code: %08X\n", mc.code[i]);
-            printf("opcode: 0x%02X\n", (mc.code[i] >> 26) & 0x3F);
-            print_binary32(mc.code[i]);
-            printf("\n");
-        }
-    
-        FILE *out = fopen("program.bin", "wb");
-        if (!out) {
-            perror("Failed to open output file");
-            exit(EXIT_FAILURE);
-        }
-        fwrite(mc.code, sizeof(uint32_t), mc.size, out);
-        fclose(out);
-    
+    MachineCode mc = assembler(asm_path);
+
+    FILE *out = fopen(bin_path, "wb");
+    if (!out) {
+        perror("Failed to open output file");
         free(mc.code);
+        exit(EXIT_FAILURE);
+    }
 
-    // You can add more tests or functionality here
+    fwrite(mc.code, sizeof(uint32_t), mc.size, out);
+    fclose(out);
+    free(mc.code);
+
     return 0;
 }

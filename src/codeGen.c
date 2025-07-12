@@ -82,13 +82,12 @@ uint32_t encodeLabel(LabelMap *labelMap, InstrLabel instr, uint32_t currentPC) {
 
     if (getLabelAddress(labelMap, label, &targetAddr)) {
 
-        int32_t rawOffset = substraction_26bit(targetAddr, currentPC);
-        int32_t offset = rawOffset >> 2; // instruction-aligned offset
+        int32_t offset = substraction_26bit(targetAddr, currentPC);
 
         if (offset < -(1 << 25) || offset >= (1 << 25)) {
             fprintf(stderr,
                 "Error: Jump offset to label '%s' (%d bytes, aligned = %d) exceeds 26-bit signed range\n",
-                label, rawOffset, offset);
+                label, offset >> 2, offset);
             exit(EXIT_FAILURE);
         }
 

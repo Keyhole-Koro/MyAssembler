@@ -1,0 +1,45 @@
+# Compiled object files
+*.o
+
+# Compiled binary files
+*.out
+*.exe
+
+# Precompiled Headers
+*.gch
+*.pch
+
+# Libraries
+*.lib
+*.a
+*.so
+*.dll
+*.dylib
+
+# Debug files
+*.dSYM/
+*.pdb
+
+# Logs and temporary files
+*.log
+*.tmp
+*.swp
+*.swo
+
+# Generated files
+*.bak
+*.old
+*.orig
+
+# IDE specific files
+.vscode/
+.idea/
+*.code-workspace
+
+# Build directories
+/build/
+/bin/
+/obj/
+
+# Dependency files
+*.d

@@ -1,58 +1,142 @@
-__start__:
-    ; load 4 into r1
-    movi r1, 4        ; r1 = 4
+__START__:
 
-    ; shift left r1 (now 8)
-    shl r1            ; r1 = 8
+  ; --- prologue --------------------------------------------------
+  push bp
+  mov  bp, sp
 
-    ; compare r1 to 8
-    movi r2, 8        
-    cmp r1, r2        ; set flags: r1 - r2
+  mov  r4, bp
 
-    ; if less, it's wrong
-    jl mismatchshl
+  movi  r1, 9
 
-    ; if greater, it's also wrong
-    jg mismatchshl
+  ; define variable 'x'
+  mov  r2, bp
+  addis r2, -4
+  store r2, r1
 
-    ; otherwise, they are equal → jump to match
-    ; (equal case doesn't need a jz since both jg/jl failed)
-    jmp matchshl      
+  ; --- if statement -----------------------------------------------
+  ; load variable 'x'
+  mov   r1, bp
+  addis  r1, -4
+  load  r1, r1
+  push r1
+  movi  r1, 5
+  pop  r2
+  cmp r2, r1
+  jg then_0
+  jmp else_1
+then_0:
+  ; --- call 'add' ---
+  ; load variable 'x'
+  mov   r1, bp
+  addis  r1, -4
+  load  r1, r1
+  push r1
+  movi  r1, 2
+  push r1
+  pop r2
+  pop r1
+  jmp add_f
 
-matchshl:
-    ; load 16 into r3
-    movi r3, 16       
+  ; x = rhs
+  mov  r2, bp
+  addis r2, -4
+  store r2, r1
+  jmp end_2
+else_1:
 
-    ; shift right r3 (now 8)
-    shr r3            ; r3 = 8
+  ; --- if statement -----------------------------------------------
+  ; load variable 'x'
+  mov   r1, bp
+  addis  r1, -4
+  load  r1, r1
+  push r1
+  movi  r1, 3
+  pop  r2
+  cmp r2, r1
+  jl then_3
+  jmp else_4
+then_3:
+  ; --- call 'add' ---
+  ; load variable 'x'
+  mov   r1, bp
+  addis  r1, -4
+  load  r1, r1
+  push r1
+  movi  r1, 1
+  push r1
+  pop r2
+  pop r1
+  jmp add_f
 
-    ; compare r3 to 8
-    movi r4, 8        
-    cmp r3, r4        
+  ; x = rhs
+  mov  r2, bp
+  addis r2, -4
+  store r2, r1
+  jmp end_2
+else_4:
+  ; --- call 'add' ---
+  ; load variable 'x'
+  mov   r1, bp
+  addis  r1, -4
+  load  r1, r1
+  push r1
+  movi  r1, 3
+  push r1
+  pop r2
+  pop r1
+  jmp add_f
 
-    ; if less, fail
-    jl failure
+  ; x = rhs
+  mov  r2, bp
+  addis r2, -4
+  store r2, r1
+end_2:
+  movi  r1, 0
 
-    ; if greater, also fail
-    jg failure
+  ; --- return ------------------------------------------------------
 
-    ; otherwise, it's equal
-    jmp success
+  ; --- program end --------------------------------------------
+  halt
 
-mismatchshl:
-    ; fail case for shl comparison
-    movi r5, 999      
-    jmp end           
 
-failure:
-    ; fail case for shr comparison
-    movi r5, 888      
-    jmp end           
+add_f:
 
-success:
-    ; success path
-    movi r5, 1        ; r5 = 1 indicates success
+  ; --- prologue --------------------------------------------------
+  push bp
+  mov  bp, sp
 
-end:
-    ; program end point
-    halt
+  mov  r4, bp
+
+  ; --- store parameter 'a' (arg0)
+
+  mov   r2, r1
+  movis r0, 4
+  sub   r4, r0
+  store r2, r4
+
+  ; --- store parameter 'b' (arg1)
+
+  mov   r2, r2
+  movis r0, 8
+  sub   r4, r0
+  store r2, r4
+
+  ; load variable 'a'
+  mov   r1, bp
+  addis  r1, -4
+  load  r1, r1
+  push r1
+
+  ; load variable 'b'
+  mov   r1, bp
+  addis  r1, -8
+  load  r1, r1
+  pop  r2
+  add  r1, r2
+  mov  r7, r1
+
+  ; --- return ------------------------------------------------------
+
+  ; --- epilogue --------------------------------------------------
+  pop  bp
+  mov  pc, lr
