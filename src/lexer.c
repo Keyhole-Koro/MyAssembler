@@ -5,6 +5,7 @@
 #include <string.h>
 #include <ctype.h>
 #include <stdbool.h>
+#include "instructions.h"
 
 #define MAX_TOKEN_LEN 20
 
@@ -80,35 +81,14 @@ void readUntil(char *buffer, int max_len, const char *ptr, bool (*condition)(cha
 
 // slow
 Token *instruction(Token *cur, const char *ptr) {
-    const char *instructions[] = {
-        "debug",
-
-        // 📥 Data Movement
-        "mov", "movi", "movis", "load", "store",
-
-        // ➕ Arithmetic/Logic
-        "add", "addis", "sub", "cmp", "and", "or", "xor", "shl", "shr",
-
-        // 🔁 Control Flow
-        "jmp", "jz", "jnz", "jg", "jl", "ja", "jb", "call", "ret",
-
-        // 📦 Stack
-        "push", "pop",
-
-        // 🌐 I/O
-        "in", "out",
-
-        // 🛑 Special
-        "halt",
-
-    };
-
-    for (long unsigned int i = 0; i < sizeof(instructions) / sizeof(instructions[0]); i++) {
-        size_t len = strlen(instructions[i]);
-        if (strncmp(ptr, instructions[i], len) == 0) {
+    // Match against canonical instruction table (lowercase, case-sensitive)
+    for (size_t i = 0; i < instruction_count; i++) {
+        const char *name = instruction_table[i].name;
+        size_t len = strlen(name);
+        if (strncmp(ptr, name, len) == 0) {
             char next = ptr[len];
-            if (next == '\0' || !isalnum(next) && next != '_') {
-                return create_token(cur, INSTRUCTION, instructions[i]);
+            if (next == '\0' || (!isalnum((unsigned char)next) && next != '_')) {
+                return create_token(cur, INSTRUCTION, name);
             }
         }
     }

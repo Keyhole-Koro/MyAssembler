@@ -70,10 +70,14 @@ uint32_t encodeReg(InstrReg instr) {
     return ENCODE(instr.opcode, 26) | ENCODE(instr.reg1, 21);
 }
 
-uint32_t substraction_26bit(uint32_t a, uint32_t b) {
-    // Perform subtraction in 26-bit space
-    int32_t result = (int32_t)(a & 0x03FFFFFF) - (int32_t)(b & 0x03FFFFFF);
-    return (uint32_t)(result & 0x03FFFFFF); // Mask to 26 bits
+int32_t sign_extend_26bit(uint32_t x) {
+    return ((int32_t)(x << 6)) >> 6;
+}
+
+int32_t substraction_26bit(uint32_t a, uint32_t b) {
+    int32_t result = (int32_t)a - (int32_t)b;
+    // Mask to 26 bits, then sign-extend
+    return sign_extend_26bit(result);
 }
 
 uint32_t encodeLabel(LabelMap *labelMap, InstrLabel instr, uint32_t currentPC) {

@@ -1,4 +1,5 @@
 #include "parser.h"
+#include "instructions.h"
 
 #define ERROR(cur, msg, ...) \
     error_with_context(__FILE__, __LINE__, cur, msg, ##__VA_ARGS__)
@@ -30,52 +31,9 @@ void consume(Token **cur) {
     *cur = next;
 }
 
-// slow
-uint8_t mapOpcode(const char *opcode) {
-    // 📥 Data Movement
-    if (strcmp(opcode, "mov") == 0)   return 0x01;
-    if (strcmp(opcode, "movi") == 0)  return 0x02;
-    if (strcmp(opcode, "movis") == 0)  return 0x18;
-    if (strcmp(opcode, "load") == 0)    return 0x03;
-    if (strcmp(opcode, "store") == 0)    return 0x04;
-
-    // ➕ Arithmetic / Logic
-    if (strcmp(opcode, "add") == 0)   return 0x05;
-    if (strcmp(opcode, "addis") == 0)   return 0x19;
-    if (strcmp(opcode, "sub") == 0)   return 0x06;
-    if (strcmp(opcode, "cmp") == 0)   return 0x07;
-    if (strcmp(opcode, "and") == 0)   return 0x08;
-    if (strcmp(opcode, "or") == 0)    return 0x09;
-    if (strcmp(opcode, "xor") == 0)   return 0x0A;
-    if (strcmp(opcode, "shl") == 0)   return 0x0B;
-    if (strcmp(opcode, "shr") == 0)   return 0x0C;
-
-    // ↺ Control Flow
-    if (strcmp(opcode, "jmp") == 0)   return 0x0D;
-    if (strcmp(opcode, "jz") == 0)    return 0x0E;
-    if (strcmp(opcode, "jnz") == 0)   return 0x0F;
-    if (strcmp(opcode, "jg") == 0)   return 0x10;
-    if (strcmp(opcode, "jl") == 0)   return 0x11;
-    if (strcmp(opcode, "ja") == 0)   return 0x12;
-    if (strcmp(opcode, "jb") == 0)   return 0x13;
-    if (strcmp(opcode, "call") == 0)   return 0x1b;
-
-
-    // 📦 Stack
-    if (strcmp(opcode, "push") == 0)  return 0x14;
-    if (strcmp(opcode, "pop") == 0)   return 0x15;
-
-    // 🌐 I/O
-    if (strcmp(opcode, "in") == 0)    return 0x16;
-    if (strcmp(opcode, "out") == 0)   return 0x17;
-
-    // 🛑 Special
-    if (strcmp(opcode, "halt") == 0)  return 0x3F;
-
-    if (strcmp(opcode, "debug") == 0) return 0x1A;
-
-    fprintf(stderr, "Unknown opcode: %s\n", opcode);
-    exit(EXIT_FAILURE);
+// central opcode lookup
+static inline uint8_t mapOpcode(const char *opcode) {
+    return opcode_from_mnemonic(opcode);
 }
 
 uint8_t mapRegister(const char *reg) {
