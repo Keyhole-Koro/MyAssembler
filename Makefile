@@ -6,7 +6,7 @@ SRC_NO_MAIN = $(filter-out src/main.c, $(SRC))
 OBJ = $(SRC:.c=.o)
 OBJ_NO_MAIN = $(SRC_NO_MAIN:.c=.o)
 
-TARGET = build/assembler
+TARGET = build/myas
 
 UNITY_SRC = tests/unity/unity.c
 TEST_SRC = $(wildcard tests/test_*.c)
