@@ -32,7 +32,7 @@ void consume(Token **cur) {
 }
 
 // Parse a '.byte' directive sequence and append data bytes to the given label line.
-static void parse_byte_directive(Token **cur, LabelInstructionLine *line) {
+static void parse_byte_directive(Token **cur, AsmBlock *line) {
     // Current token should be the identifier following '.'
     if (!*cur || (*cur)->type != LABEL || strcmp((*cur)->str, "byte") != 0) {
         ERROR(*cur, "Unknown directive after '.': %s\n", (*cur) ? (*cur)->str : "<eof>");
@@ -79,19 +79,19 @@ uint8_t mapRegister(const char *reg) {
 }
 
 
-InstructionList *instrNoOperand(Token *opcode) {
-    InstructionList *instrList = malloc(sizeof(InstructionList));
+AsmInstr *instrNoOperand(Token *opcode) {
+    AsmInstr *instrList = malloc(sizeof(AsmInstr));
     InstrNoOperand *noOperand = malloc(sizeof(InstrNoOperand));
     instrList->kind = INSTR_NO_OPERAND;
     noOperand->opcode = mapOpcode(opcode->str);
     instrList->instruction = (Instruction *)noOperand;
     instrList->needs_fixup = false; // No fixup needed for no operand instructions
     instrList->next = NULL; // Initialize next pointer to NULL
-    return (InstructionList *)instrList;
+    return (AsmInstr *)instrList;
 }
 
-InstructionList *instrReg(Token *opcode, Token *reg1) {
-    InstructionList *instrList = malloc(sizeof(InstructionList));
+AsmInstr *instrReg(Token *opcode, Token *reg1) {
+    AsmInstr *instrList = malloc(sizeof(AsmInstr));
     InstrReg *reg = malloc(sizeof(InstrReg));
     instrList->kind = INSTR_REG;
     reg->opcode = mapOpcode(opcode->str);
@@ -99,11 +99,11 @@ InstructionList *instrReg(Token *opcode, Token *reg1) {
     instrList->instruction = (Instruction *)reg;
     instrList->needs_fixup = false; // No fixup needed for register instructions
     instrList->next = NULL; // Initialize next pointer to NULL
-    return (InstructionList *)instrList;
+    return (AsmInstr *)instrList;
 }
 
-InstructionList *instrRegReg(Token *opcode, Token *reg1, Token *reg2) {
-    InstructionList *instrList = malloc(sizeof(InstructionList));
+AsmInstr *instrRegReg(Token *opcode, Token *reg1, Token *reg2) {
+    AsmInstr *instrList = malloc(sizeof(AsmInstr));
     InstrRegReg *regReg = malloc(sizeof(InstrRegReg));
     instrList->kind = INSTR_REGREG;
     regReg->opcode = mapOpcode(opcode->str);
@@ -112,11 +112,11 @@ InstructionList *instrRegReg(Token *opcode, Token *reg1, Token *reg2) {
     instrList->instruction = (Instruction *)regReg;
     instrList->needs_fixup = false; // No fixup needed for register instructions
     instrList->next = NULL; // Initialize next pointer to NULL
-    return (InstructionList *)instrList;
+    return (AsmInstr *)instrList;
 }
 
-InstructionList *instrRegImm21(Token *opcode, Token *reg1, Token *imm21) {
-    InstructionList *instrList = malloc(sizeof(InstructionList));
+AsmInstr *instrRegImm21(Token *opcode, Token *reg1, Token *imm21) {
+    AsmInstr *instrList = malloc(sizeof(AsmInstr));
     InstrRegImm21 *regImm21 = malloc(sizeof(InstrRegImm21));
     instrList->kind = INSTR_REGIMM21;
     regImm21->opcode = mapOpcode(opcode->str);
@@ -134,10 +134,10 @@ InstructionList *instrRegImm21(Token *opcode, Token *reg1, Token *imm21) {
     instrList->instruction = (Instruction *)regImm21;
     instrList->needs_fixup = false; // No fixup needed for immediate instructions
     instrList->next = NULL; // Initialize next pointer to NULL
-    return (InstructionList *)instrList;
+    return (AsmInstr *)instrList;
 }
 
-InstructionList *instrRegAppears(Token **cur, Token *opcode, Token *reg1) {
+AsmInstr *instrRegAppears(Token **cur, Token *opcode, Token *reg1) {
     if ((*cur) && (*cur)->type == COMMA) {
         consume(cur);
         if ((*cur)->type == REGISTER) {
@@ -151,7 +151,7 @@ InstructionList *instrRegAppears(Token **cur, Token *opcode, Token *reg1) {
             return instrRegImm21(opcode, reg1, imm21);
         } else if ((*cur)->type == LABEL && (*cur)->next != NULL && (*cur)->next->type != COLON) {
             // reg, label -> treat as immediate fixup for label address
-            InstructionList *instrList = malloc(sizeof(InstructionList));
+            AsmInstr *instrList = malloc(sizeof(AsmInstr));
             InstrRegLabel *rl = malloc(sizeof(InstrRegLabel));
             instrList->kind = INSTR_REGLABEL;
             rl->opcode = mapOpcode(opcode->str);
@@ -172,8 +172,8 @@ InstructionList *instrRegAppears(Token **cur, Token *opcode, Token *reg1) {
     }
 }
 
-InstructionList *instrLabel(Token *opcode, Token *label) {
-    InstructionList *instrList = malloc(sizeof(InstructionList));
+AsmInstr *instrLabel(Token *opcode, Token *label) {
+    AsmInstr *instrList = malloc(sizeof(AsmInstr));
     InstrLabel *instrlabel = malloc(sizeof(InstrLabel));
     instrList->kind = INSTR_LABEL;
     instrlabel->opcode = mapOpcode(opcode->str);
@@ -181,11 +181,11 @@ InstructionList *instrLabel(Token *opcode, Token *label) {
     instrList->instruction = (Instruction *)instrlabel;
     instrList->needs_fixup = true; // Fixup needed for label instructions
     instrList->next = NULL; // Initialize next pointer to NULL
-    return (InstructionList *)instrList;
+    return (AsmInstr *)instrList;
 }
 
-InstructionList *instrImm26(Token *opcode, Token *imm26) {
-    InstructionList *instrList = malloc(sizeof(InstructionList));
+AsmInstr *instrImm26(Token *opcode, Token *imm26) {
+    AsmInstr *instrList = malloc(sizeof(AsmInstr));
     InstrImm26 *imm26Instr = malloc(sizeof(InstrImm26));
     instrList->kind = INSTR_IMM26;
     imm26Instr->opcode = mapOpcode(opcode->str);
@@ -193,10 +193,10 @@ InstructionList *instrImm26(Token *opcode, Token *imm26) {
     instrList->instruction = (Instruction *)imm26Instr;
     instrList->needs_fixup = false; // No fixup needed for immediate instructions
     instrList->next = NULL; // Initialize next pointer to NULL
-    return (InstructionList *)instrList;
+    return (AsmInstr *)instrList;
 }
 
-InstructionList *instructions(Token **cur) {
+AsmInstr *instructions(Token **cur) {
     if ((*cur)->type == INSTRUCTION) {
         Token *opcode = *cur;
         consume(cur);
@@ -223,16 +223,16 @@ InstructionList *instructions(Token **cur) {
             return instrNoOperand(opcode);
         }
     } else {
-        ERROR(*cur, "Unexpected token type for InstructionList: %s\n", token_type_to_string((*cur)->type));
+        ERROR(*cur, "Unexpected token type for instruction: %s\n", token_type_to_string((*cur)->type));
         exit(EXIT_FAILURE);
     }
     
 }
 
-LabelInstructionLine *label(Token **cur) {
+AsmBlock *label(Token **cur) {
     Token *label = *cur;
     consume(cur);
-    LabelInstructionLine *label_inst_line = malloc(sizeof(LabelInstructionLine));
+    AsmBlock *label_inst_line = malloc(sizeof(AsmBlock));
     label_inst_line->label = label->str; // Store the label string
     label_inst_line->num_instrucitons = 0; // Initialize the number of instructions to 0
     label_inst_line->inst_list = NULL; // Initialize the list of instructions pointer to NULL
@@ -240,7 +240,7 @@ LabelInstructionLine *label(Token **cur) {
     label_inst_line->data_count = 0;
     label_inst_line->next = NULL; // Initialize the next pointer to NULL
     
-    InstructionList *cur_inst = label_inst_line->inst_list;
+    AsmInstr *cur_inst = label_inst_line->inst_list;
 
     if ((*cur)->type == COLON) {
         consume(cur);
@@ -248,7 +248,7 @@ LabelInstructionLine *label(Token **cur) {
 
         while (*cur && (*cur)->type != EOF) {
             if ((*cur)->type == INSTRUCTION) {
-                InstructionList *new_inst = instructions(cur);
+                AsmInstr *new_inst = instructions(cur);
                 label_inst_line->num_instrucitons++;
                 if (label_inst_line->inst_list == NULL) {
                     label_inst_line->inst_list = new_inst;
@@ -276,12 +276,12 @@ LabelInstructionLine *label(Token **cur) {
     return label_inst_line;
 }
 
-LabelInstructionLine *parser(Token *head) {
-    LabelInstructionLine *head_label_inst_line = NULL;
-    LabelInstructionLine *cur_label_inst_line = NULL;
+AsmBlock *parser(Token *head) {
+    AsmBlock *head_label_inst_line = NULL;
+    AsmBlock *cur_label_inst_line = NULL;
     cur_label_inst_line = head_label_inst_line;
 
-    LabelInstructionLine *new_label = NULL;
+    AsmBlock *new_label = NULL;
     Token **cur = &head;
     while (*cur) {
         if ((*cur)->type == 0) consume(cur); // Skip

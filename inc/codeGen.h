@@ -16,6 +16,6 @@ typedef struct {
 // Encode a single data byte (mask to 8 bits)
 uint8_t encodeByte(uint32_t value);
 
-MachineCode codeGen(LabelInstructionLine *head);
+MachineCode codeGen(AsmBlock *head);
 
 #endif

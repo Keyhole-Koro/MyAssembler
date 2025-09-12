@@ -31,7 +31,7 @@ MachineCode assembler(const char *file_path, const char *output_path) {
         return (MachineCode){NULL, 0};
     }
 
-    LabelInstructionLine *parsed = parser(tokens);
+    AsmBlock *parsed = parser(tokens);
 
     // Build debug report path: same directory as output_path, filename is
     // <input-stem>_asm.txt

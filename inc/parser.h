@@ -89,8 +89,8 @@ typedef union {
     InstrRegLabel reglabel;
 } Instruction;
 
-typedef struct InstructionList InstructionList;
-struct InstructionList {
+typedef struct AsmInstr AsmInstr;
+struct AsmInstr {
     InstructionKind kind;
 
     Instruction *instruction;
@@ -98,20 +98,20 @@ struct InstructionList {
     // must be replaced/fixed later (e.g., relative address fixup)
     bool needs_fixup;  
 
-    InstructionList *next; // Pointer to the next encoded instruction
+    AsmInstr *next; // Pointer to the next encoded instruction
 };
 
-// Instruction line containing optional label and encoded instruction
-typedef struct LabelInstructionLine LabelInstructionLine;
-struct LabelInstructionLine {
+// Labeled block containing instructions and optional data
+typedef struct AsmBlock AsmBlock;
+struct AsmBlock {
     char *label; // Empty string if no label
     int num_instrucitons; // Number of instructions
-    InstructionList *inst_list;            // Pointer to encoded instruction data
+    AsmInstr *inst_list;            // Pointer to encoded instruction data
     // Data payload for this label (from directives like .byte)
     unsigned char *data; // raw bytes
     size_t data_count;   // number of bytes
-    LabelInstructionLine *next; // Pointer to the next label instruction line
+    AsmBlock *next; // Pointer to the next labeled block
 };
 
-LabelInstructionLine *parser(Token *head);
+AsmBlock *parser(Token *head);
 #endif // PARSER_H
