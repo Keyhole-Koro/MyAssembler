@@ -55,6 +55,13 @@ typedef struct {
     uint32_t imm26;   // 26 bits (stored in 32 bits)
 } InstrImm26;
 
+// Pattern: reg, label (e.g. MOVI R1, label)
+typedef struct {
+    uint8_t opcode;   // 6 bits
+    uint8_t reg1;     // 5 bits
+    char *label;      // unresolved label to be fixed to imm21
+} InstrRegLabel;
+
 // Pattern: no operand (e.g. RET, HALT)
 typedef struct {
     uint8_t opcode;   // 6 bits only
@@ -66,7 +73,8 @@ typedef enum {
     INSTR_REG,
     INSTR_LABEL,
     INSTR_IMM26,
-    INSTR_NO_OPERAND
+    INSTR_NO_OPERAND,
+    INSTR_REGLABEL
 } InstructionKind;
 
 // Union that covers all instruction patterns
@@ -78,6 +86,7 @@ typedef union {
     InstrLabel label;
     InstrImm26 imm26;
     InstrNoOperand noOperand;
+    InstrRegLabel reglabel;
 } Instruction;
 
 typedef struct InstructionList InstructionList;
@@ -98,6 +107,9 @@ struct LabelInstructionLine {
     char *label; // Empty string if no label
     int num_instrucitons; // Number of instructions
     InstructionList *inst_list;            // Pointer to encoded instruction data
+    // Data payload for this label (from directives like .byte)
+    unsigned char *data; // raw bytes
+    size_t data_count;   // number of bytes
     LabelInstructionLine *next; // Pointer to the next label instruction line
 };
 

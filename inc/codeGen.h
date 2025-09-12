@@ -9,9 +9,12 @@
 #include "utils.h"
 
 typedef struct {
-    uint32_t *code;
-    size_t size;
+    uint8_t *code; // raw bytes
+    size_t size;   // number of bytes
 } MachineCode;
+
+// Encode a single data byte (mask to 8 bits)
+uint8_t encodeByte(uint32_t value);
 
 MachineCode codeGen(LabelInstructionLine *head);
 
