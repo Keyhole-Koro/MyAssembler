@@ -31,6 +31,29 @@ void consume(Token **cur) {
     *cur = next;
 }
 
+// Parse a '.byte' directive sequence and append data bytes to the given label line.
+static void parse_byte_directive(Token **cur, LabelInstructionLine *line) {
+    // Current token should be the identifier following '.'
+    if (!*cur || (*cur)->type != LABEL || strcmp((*cur)->str, "byte") != 0) {
+        ERROR(*cur, "Unknown directive after '.': %s\n", (*cur) ? (*cur)->str : "<eof>");
+    }
+    consume(cur); // consume 'byte'
+
+    // Read one or more byte values separated by commas; stop at newline or non-number
+    while (*cur && ((*cur)->type == NUMBER || (*cur)->type == NEGATIVE_NUMBER)) {
+        long v = atoi((*cur)->str);
+        unsigned char b = (unsigned char)(v & 0xFF);
+        size_t n = line->data_count;
+        line->data = realloc(line->data, n + 1);
+        line->data[n] = b;
+        line->data_count = n + 1;
+        consume(cur);
+        if (*cur && (*cur)->type == COMMA) { consume(cur); continue; }
+        break;
+    }
+    if (*cur && (*cur)->type == NEWLINE) { consume(cur); }
+}
+
 // central opcode lookup
 static inline uint8_t mapOpcode(const char *opcode) {
     return opcode_from_mnemonic(opcode);
@@ -126,7 +149,19 @@ InstructionList *instrRegAppears(Token **cur, Token *opcode, Token *reg1) {
             Token *imm21 = *cur; // Save the immediate value
             consume(cur);
             return instrRegImm21(opcode, reg1, imm21);
-        
+        } else if ((*cur)->type == LABEL && (*cur)->next != NULL && (*cur)->next->type != COLON) {
+            // reg, label -> treat as immediate fixup for label address
+            InstructionList *instrList = malloc(sizeof(InstructionList));
+            InstrRegLabel *rl = malloc(sizeof(InstrRegLabel));
+            instrList->kind = INSTR_REGLABEL;
+            rl->opcode = mapOpcode(opcode->str);
+            rl->reg1 = mapRegister(reg1->str);
+            rl->label = (*cur)->str;
+            instrList->instruction = (Instruction *)rl;
+            instrList->needs_fixup = true; // Fixup needed when resolving label address
+            instrList->next = NULL;
+            consume(cur);
+            return instrList;
         
         } else {
             ERROR(*cur, "Expected REGISTER or NUMBER after COMMA but found: %s\n", (*cur)->str);
@@ -201,6 +236,8 @@ LabelInstructionLine *label(Token **cur) {
     label_inst_line->label = label->str; // Store the label string
     label_inst_line->num_instrucitons = 0; // Initialize the number of instructions to 0
     label_inst_line->inst_list = NULL; // Initialize the list of instructions pointer to NULL
+    label_inst_line->data = NULL;
+    label_inst_line->data_count = 0;
     label_inst_line->next = NULL; // Initialize the next pointer to NULL
     
     InstructionList *cur_inst = label_inst_line->inst_list;
@@ -209,17 +246,27 @@ LabelInstructionLine *label(Token **cur) {
         consume(cur);
         if ((*cur) == NULL) return NULL; // Handle end of tokens gracefully
 
-        while (*cur && (*cur)->type == INSTRUCTION && (*cur)->type != EOF) {
-
-            InstructionList *new_inst = instructions(cur);
-            label_inst_line->num_instrucitons++;
-            if (label_inst_line->inst_list == NULL) {
-                label_inst_line->inst_list = new_inst;
-                cur_inst = new_inst;
-            } else {
-                cur_inst->next = new_inst;
-                cur_inst = new_inst;
+        while (*cur && (*cur)->type != EOF) {
+            if ((*cur)->type == INSTRUCTION) {
+                InstructionList *new_inst = instructions(cur);
+                label_inst_line->num_instrucitons++;
+                if (label_inst_line->inst_list == NULL) {
+                    label_inst_line->inst_list = new_inst;
+                    cur_inst = new_inst;
+                } else {
+                    cur_inst->next = new_inst;
+                    cur_inst = new_inst;
+                }
+                continue;
             }
+            if ((*cur)->type == PERIOD) {
+                consume(cur);
+                parse_byte_directive(cur, label_inst_line);
+                continue;
+            }
+            if ((*cur)->type == NEWLINE) { consume(cur); continue; }
+            if ((*cur)->type == LABEL && (*cur)->next && (*cur)->next->type == COLON) { break; }
+            ERROR(*cur, "Unexpected token in label block: %s\n", token_type_to_string((*cur)->type));
         }
     } else {
         ERROR(*cur, "Expected ':' after %s but found: %s\n", label->str, (*cur)->str);

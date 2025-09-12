@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
+#include <string.h>
 
 #define ENCODE(op, shift) ((uint32_t)(op) << (shift))
 
@@ -53,6 +54,10 @@ int getLabelAddress(LabelMap *map, const char *label, uint32_t *out_address) {
         }
     }
     return 0; // Not found
+}
+
+uint8_t encodeByte(uint32_t value) {
+    return (uint8_t)(value & 0xFFu);
 }
 
 uint32_t encodeRegReg(InstrRegReg instr) {
@@ -128,6 +133,19 @@ uint32_t encodeInstruction(LabelMap *map, InstructionList *inst_list, uint32_t c
             return encodeLabel(map, inst->label, currentPC);
         case INSTR_IMM26:
             return encodeImm26(inst->imm26);
+        case INSTR_REGLABEL: {
+            uint32_t addr;
+            if (!getLabelAddress(map, inst->reglabel.label, &addr)) {
+                fprintf(stderr, "Error: Label '%s' not found\n", inst->reglabel.label);
+                exit(EXIT_FAILURE);
+            }
+            if (addr >= (1u << 21)) {
+                fprintf(stderr, "Error: Address 0x%X exceeds 21-bit immediate range for reg,label\n", addr);
+                exit(EXIT_FAILURE);
+            }
+            InstrRegImm21 tmp = { .opcode = inst->reglabel.opcode, .reg1 = inst->reglabel.reg1, .imm21 = addr & 0x1FFFFF };
+            return encodeRegImm21(tmp);
+        }
         case INSTR_NO_OPERAND:
             return encodeNoOperand(inst->noOperand);
         // etc.
@@ -149,11 +167,12 @@ MachineCode codeGen(LabelInstructionLine *head) {
         if (line->label && strlen(line->label) > 0) {
             mapLabelToAddress(&labelMap, line->label, pc);
             pc += (line->num_instrucitons) * sizeof(uint32_t);
+            pc += (uint32_t)line->data_count; // account for data bytes
         }
     }
 
-    uint32_t instrCount = pc / 4;
-    uint32_t *machineCode = malloc(instrCount * sizeof(uint32_t));
+    uint32_t total_bytes = pc; // total output size in bytes
+    uint8_t *machineCode = malloc(total_bytes);
     if (!machineCode) {
         perror("Failed to allocate machine code buffer");
         exit(EXIT_FAILURE);
@@ -166,16 +185,30 @@ MachineCode codeGen(LabelInstructionLine *head) {
             uint32_t encoded;
             if (inst->needs_fixup) {
                 // Assume it's a label-based instruction
-                encoded = encodeLabel(&labelMap, inst->instruction->label, pc);
+                if (inst->kind == INSTR_LABEL) {
+                    encoded = encodeLabel(&labelMap, inst->instruction->label, pc);
+                } else if (inst->kind == INSTR_REGLABEL) {
+                    encoded = encodeInstruction(&labelMap, inst, pc);
+                } else {
+                    encoded = encodeInstruction(&labelMap, inst, pc);
+                }
             } else {
                 encoded = encodeInstruction(&labelMap, inst, pc);
             }
 
-            machineCode[pc / 4] = encoded;
+            // Write 4 bytes in native endianness (consistent with prior uint32_t array write)
+            memcpy(machineCode + pc, &encoded, sizeof(uint32_t));
             pc += 4;
+        }
+
+        // Append raw data bytes if present
+        if (line->data_count > 0) {
+            for (size_t i = 0; i < line->data_count; ++i) {
+                machineCode[pc++] = encodeByte(line->data[i]);
+            }
         }
     }
 
-    MachineCode result = { .code = machineCode, .size = instrCount };
+    MachineCode result = { .code = machineCode, .size = total_bytes };
     return result;
 }
