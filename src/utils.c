@@ -53,8 +53,8 @@ static const char* reg_name(uint8_t code) {
     }
 }
 
-static void print_instruction_list(const InstructionList *inst_list, int indent) {
-    for (const InstructionList *n = inst_list; n; n = n->next) {
+static void print_instruction_list(const AsmInstr *inst_list, int indent) {
+    for (const AsmInstr *n = inst_list; n; n = n->next) {
         const Instruction *inst = n->instruction;
         const char *mn = mnemonic_from_opcode(inst->base.opcode);
         for (int i = 0; i < indent; ++i) putchar(' ');
@@ -90,13 +90,13 @@ static void print_instruction_list(const InstructionList *inst_list, int indent)
     }
 }
 
-void print_label_instruction_lines(const LabelInstructionLine *head) {
+void print_label_instruction_lines(const AsmBlock *head) {
     // Delegate to file-based implementation for consistency
     fprint_label_instruction_lines(stdout, head);
 }
 
-static void fprint_instruction_list(FILE *out, const InstructionList *inst_list, int indent) {
-    for (const InstructionList *n = inst_list; n; n = n->next) {
+static void fprint_instruction_list(FILE *out, const AsmInstr *inst_list, int indent) {
+    for (const AsmInstr *n = inst_list; n; n = n->next) {
         const Instruction *inst = n->instruction;
         const char *mn = mnemonic_from_opcode(inst->base.opcode);
         for (int i = 0; i < indent; ++i) fputc(' ', out);
@@ -132,10 +132,10 @@ static void fprint_instruction_list(FILE *out, const InstructionList *inst_list,
     }
 }
 
-void fprint_label_instruction_lines(FILE *out, const LabelInstructionLine *head) {
+void fprint_label_instruction_lines(FILE *out, const AsmBlock *head) {
     if (!out) return;
     fprintf(out, "Program:\n");
-    for (const LabelInstructionLine *line = head; line; line = line->next) {
+    for (const AsmBlock *line = head; line; line = line->next) {
         fprintf(out, "%s:\n", line->label ? line->label : "<no-label>");
         if (line->inst_list) {
             fprint_instruction_list(out, line->inst_list, 2);
@@ -161,7 +161,7 @@ void print_tokens(const Token *tokens) {
     fprint_tokens(stdout, tokens);
 }
 
-void write_debug_report(const char *path, const Token *tokens, const LabelInstructionLine *program) {
+void write_debug_report(const char *path, const Token *tokens, const AsmBlock *program) {
     if (!path) return;
     FILE *out = fopen(path, "w");
     if (!out) {

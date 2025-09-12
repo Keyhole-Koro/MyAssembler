@@ -120,7 +120,7 @@ uint32_t encodeNoOperand(InstrNoOperand instr) {
     return ENCODE(instr.opcode, 26);
 }
 
-uint32_t encodeInstruction(LabelMap *map, InstructionList *inst_list, uint32_t currentPC) {
+uint32_t encodeInstruction(LabelMap *map, AsmInstr *inst_list, uint32_t currentPC) {
     Instruction *inst = inst_list->instruction;
     switch (inst_list->kind) {
         case INSTR_REGREG:
@@ -155,14 +155,14 @@ uint32_t encodeInstruction(LabelMap *map, InstructionList *inst_list, uint32_t c
     }
 }
 
-MachineCode codeGen(LabelInstructionLine *head) {
+MachineCode codeGen(AsmBlock *head) {
     LabelMap labelMap;
 
     initLabelMap(&labelMap);
 
     // First pass: assign addresses to labels
     uint32_t pc = 0;
-    for (LabelInstructionLine *line = head; line; line = line->next) {
+    for (AsmBlock *line = head; line; line = line->next) {
 
         if (line->label && strlen(line->label) > 0) {
             mapLabelToAddress(&labelMap, line->label, pc);
@@ -180,8 +180,8 @@ MachineCode codeGen(LabelInstructionLine *head) {
 
     // Second pass: encode instructions
     pc = 0;
-    for (LabelInstructionLine *line = head; line; line = line->next) {
-        for (InstructionList *inst = line->inst_list; inst; inst = inst->next) {
+    for (AsmBlock *line = head; line; line = line->next) {
+        for (AsmInstr *inst = line->inst_list; inst; inst = inst->next) {
             uint32_t encoded;
             if (inst->needs_fixup) {
                 // Assume it's a label-based instruction
