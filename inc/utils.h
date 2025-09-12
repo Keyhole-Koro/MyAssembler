@@ -6,6 +6,9 @@
 
 #include "lexer.h"
 
+int32_t sign_extend_26bit(uint32_t x);
+int32_t substraction_26bit(uint32_t a, uint32_t b);
+
 const char* token_type_to_string(TokenType type);
 
 void print_binary32(uint32_t value);

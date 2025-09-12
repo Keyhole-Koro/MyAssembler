@@ -4,6 +4,20 @@
 
 #include <string.h>
 
+int32_t sign_extend_26bit(uint32_t x) {
+    return ((int32_t)(x << 6)) >> 6;
+}
+
+int32_t sign_extend_21bit(uint32_t x) {
+    return ((int32_t)(x << 11)) >> 11;
+}
+
+int32_t substraction_26bit(uint32_t a, uint32_t b) {
+    int32_t result = (int32_t)a - (int32_t)b;
+    // Mask to 26 bits, then sign-extend
+    return sign_extend_26bit(result);
+}
+
 const char* token_type_to_string(TokenType type) {
     switch (type) {
         case COLON:       return "COLON";
@@ -63,18 +77,22 @@ static void print_instruction_list(const AsmInstr *inst_list, int indent) {
             case INSTR_REGREG:
                 printf("%s, %s", reg_name(inst->regreg.reg1), reg_name(inst->regreg.reg2));
                 break;
-            case INSTR_REGIMM21:
-                printf("%s, %u", reg_name(inst->regimm21.reg1), inst->regimm21.imm21 & 0x1FFFFF);
+            case INSTR_REGIMM21: {
+                int32_t imm = sign_extend_21bit(inst->regimm21.imm21 & 0x1FFFFF);
+                printf("%s, %d", reg_name(inst->regimm21.reg1), imm);
                 break;
+            }
             case INSTR_REG:
                 printf("%s", reg_name(inst->reg.reg1));
                 break;
             case INSTR_LABEL:
                 printf("%s", inst->label.label);
                 break;
-            case INSTR_IMM26:
-                printf("#%u", inst->imm26.imm26 & 0x3FFFFFF);
+            case INSTR_IMM26: {
+                int32_t imm = sign_extend_26bit(inst->imm26.imm26 & 0x3FFFFFF);
+                printf("#%d", imm);
                 break;
+            }
             case INSTR_NO_OPERAND:
                 // nothing
                 break;
@@ -105,18 +123,22 @@ static void fprint_instruction_list(FILE *out, const AsmInstr *inst_list, int in
             case INSTR_REGREG:
                 fprintf(out, "%s, %s", reg_name(inst->regreg.reg1), reg_name(inst->regreg.reg2));
                 break;
-            case INSTR_REGIMM21:
-                fprintf(out, "%s, %u", reg_name(inst->regimm21.reg1), inst->regimm21.imm21 & 0x1FFFFF);
+            case INSTR_REGIMM21: {
+                int32_t imm = sign_extend_21bit(inst->regimm21.imm21 & 0x1FFFFF);
+                fprintf(out, "%s, %d", reg_name(inst->regimm21.reg1), imm);
                 break;
+            }
             case INSTR_REG:
                 fprintf(out, "%s", reg_name(inst->reg.reg1));
                 break;
             case INSTR_LABEL:
                 fprintf(out, "%s", inst->label.label);
                 break;
-            case INSTR_IMM26:
-                fprintf(out, "#%u", inst->imm26.imm26 & 0x3FFFFFF);
+            case INSTR_IMM26: {
+                int32_t imm = sign_extend_26bit(inst->imm26.imm26 & 0x3FFFFFF);
+                fprintf(out, "#%d", imm);
                 break;
+            }
             case INSTR_NO_OPERAND:
                 // nothing
                 break;
