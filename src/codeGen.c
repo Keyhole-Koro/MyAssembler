@@ -157,7 +157,9 @@ MachineCode codeGen(AsmBlock *head) {
         if (line->label && strlen(line->label) > 0) {
             mapLabelToAddress(&labelMap, line->label, pc);
             pc += (line->num_instrucitons) * sizeof(uint32_t);
-            pc += (uint32_t)line->data_count; // account for data bytes
+            uint32_t data_bytes = (uint32_t)line->data_count;
+            uint32_t padded_data = (data_bytes + 3u) & ~3u;
+            pc += padded_data; // account for data bytes (word-aligned for loader)
         }
     }
 
@@ -193,8 +195,20 @@ MachineCode codeGen(AsmBlock *head) {
 
         // Append raw data bytes if present
         if (line->data_count > 0) {
-            for (size_t i = 0; i < line->data_count; ++i) {
-                machineCode[pc++] = encodeByte(line->data[i]);
+            size_t data_bytes = line->data_count;
+            size_t padded_data = (data_bytes + 3u) & ~3u;
+            for (size_t i = 0; i < padded_data; i += 4) {
+                uint8_t block[4] = {0, 0, 0, 0};
+                for (size_t j = 0; j < 4; ++j) {
+                    size_t idx = i + j;
+                    if (idx < data_bytes) {
+                        block[j] = encodeByte(line->data[idx]);
+                    }
+                }
+                machineCode[pc++] = block[3];
+                machineCode[pc++] = block[2];
+                machineCode[pc++] = block[1];
+                machineCode[pc++] = block[0];
             }
         }
     }
