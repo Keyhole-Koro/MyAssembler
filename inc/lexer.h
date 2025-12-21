@@ -18,9 +18,11 @@ typedef struct Token Token;
 struct Token {
     TokenType type;
     char *str;
+    int line;
+    int col;
     Token *next;
 };
 
-Token *lexer(const char *ptr, Token **head, Token *cur);
+Token *lexer(const char *ptr, Token **head, Token *cur, int line);
 
 #endif
