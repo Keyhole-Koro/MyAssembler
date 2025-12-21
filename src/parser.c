@@ -2,21 +2,52 @@
 #include "instructions.h"
 
 #define ERROR(cur, msg, ...) \
-    error_with_context(__FILE__, __LINE__, cur, msg, ##__VA_ARGS__)
+    error_with_context(cur, msg, ##__VA_ARGS__)
 
-void error_with_context(const char *file, int line, Token *cur, const char *msg, ...) {
-    fprintf(stderr, "Error at %s:%d: ", file, line);
+static const char *g_src_file = NULL;
+void parser_set_source_file(const char *path) { g_src_file = path; }
+
+static void print_line_snippet(const char *file, int line, int col) {
+    if (!file || line <= 0) return;
+    FILE *fp = fopen(file, "r");
+    if (!fp) return;
+    char buf[512];
+    int cur_line = 1;
+    while (fgets(buf, sizeof(buf), fp)) {
+        if (cur_line == line) {
+            size_t len = strlen(buf);
+            while (len > 0 && (buf[len-1] == '\n' || buf[len-1] == '\r')) buf[--len] = '\0';
+            fprintf(stderr, "  %s\n", buf);
+            if (col > 0) fprintf(stderr, "  %*s^\n", col, "");
+            break;
+        }
+        cur_line++;
+    }
+    fclose(fp);
+}
+
+void error_with_context(Token *cur, const char *msg, ...) {
+    fprintf(stderr, "%s:%d:%d: error: ",
+            g_src_file ? g_src_file : "<asm>",
+            cur ? cur->line : 0,
+            cur ? cur->col : 0);
 
     va_list args;
     va_start(args, msg);
     vfprintf(stderr, msg, args);
     va_end(args);
 
-    fprintf(stderr, "\nNext tokens:\n");
+    fprintf(stderr, "\n");
+    if (cur) print_line_snippet(g_src_file, cur->line, cur->col);
+
+    fprintf(stderr, "Next tokens:\n");
     int count = 0;
-    while (cur && count++ < 5) {
-        fprintf(stderr, "  [%d] type=%s, str='%s'\n", count, token_type_to_string(cur->type), cur->str);
-        cur = cur->next;
+    Token *t = cur;
+    while (t && count++ < 5) {
+        fprintf(stderr, "  [%d] type=%s, str='%s' (line %d, col %d)\n",
+                count, token_type_to_string(t->type), t->str,
+                t->line, t->col);
+        t = t->next;
     }
 
     exit(EXIT_FAILURE);
@@ -284,7 +315,8 @@ AsmBlock *parser(Token *head) {
     AsmBlock *new_label = NULL;
     Token **cur = &head;
     while (*cur) {
-        if ((*cur)->type == 0) consume(cur); // Skip
+        while (*cur && (*cur)->type == NEWLINE) consume(cur);
+        if ((*cur)->type == 0) { consume(cur); continue; } // Skip
 
         if ((*cur)->type == LABEL) {
             new_label = label(cur);

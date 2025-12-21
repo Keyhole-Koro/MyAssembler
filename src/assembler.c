@@ -15,8 +15,10 @@ Token *_lexer(const char *file_path) {
     Token *head = NULL;
     Token *cur = NULL;
 
+    int line = 1;
     while (fgets(buffer, sizeof(buffer), file)) {
-        cur = lexer(buffer, &head, cur);
+        cur = lexer(buffer, &head, cur, line);
+        line++;
     }
 
     fclose(file);
@@ -25,6 +27,7 @@ Token *_lexer(const char *file_path) {
 }
 
 MachineCode assembler(const char *file_path, const char *output_path) {
+    parser_set_source_file(file_path);
     Token *tokens = _lexer(file_path);
     if (!tokens) {
         fprintf(stderr, "No tokens found.\n");

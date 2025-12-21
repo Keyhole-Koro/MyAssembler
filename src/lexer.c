@@ -48,11 +48,13 @@ char* itostr(long value) {
     return str;
 }
 
-Token *create_token(Token *cur, TokenType type, const char *str) {
+Token *create_token(Token *cur, TokenType type, const char *str, int line, int col) {
     Token *token = (Token *)calloc(1, sizeof(Token));
     token->type = type;
     token->str = (char *)calloc(strlen(str) + 1, 1);
     strcpy(token->str, str);
+    token->line = line;
+    token->col = col;
     cur->next = token;
     return token;
 }
@@ -80,7 +82,7 @@ void readUntil(char *buffer, int max_len, const char *ptr, bool (*condition)(cha
 }
 
 // slow
-Token *instruction(Token *cur, const char *ptr) {
+Token *instruction(Token *cur, const char *ptr, int line, int col) {
     // Match against canonical instruction table (lowercase, case-sensitive)
     for (size_t i = 0; i < instruction_count; i++) {
         const char *name = instruction_table[i].name;
@@ -88,7 +90,7 @@ Token *instruction(Token *cur, const char *ptr) {
         if (strncmp(ptr, name, len) == 0) {
             char next = ptr[len];
             if (next == '\0' || (!isalnum((unsigned char)next) && next != '_')) {
-                return create_token(cur, INSTRUCTION, name);
+                return create_token(cur, INSTRUCTION, name, line, col);
             }
         }
     }
@@ -116,7 +118,7 @@ bool is_register(const char *reg, char *buffer) {
     return false;
 }
 
-Token *lexer(const char *ptr, Token **head, Token *cur) {
+Token *lexer(const char *ptr, Token **head, Token *cur, int line) {
 
     if (*head == NULL) {
         *head = (Token *)calloc(1, sizeof(Token));
@@ -124,27 +126,37 @@ Token *lexer(const char *ptr, Token **head, Token *cur) {
     } 
 
     char buffer[MAX_TOKEN_LEN];
+    int col = 1;
     
     while (*ptr) {
         buffer[0] = '\0';  // Reset buffer
+
+        if (*ptr == '\n') {
+            int tok_line = line, tok_col = col;
+            cur = create_token(cur, NEWLINE, "\n", tok_line, tok_col);
+            col = 1;
+            ptr++;
+            continue;
+        }
+
         if (isspace(*ptr)) {
+            col++;
             ptr++;
             continue;
         }
 
         if (isTab(*ptr)) {
+            col++;
             ptr++;
             continue;
         }
 
-        if (*ptr == '\n') {
-            cur = create_token(cur, NEWLINE, "\n");
-            ptr++;
-            continue;
-        }
+        int tok_line = line;
+        int tok_col = col;
 
         if (*ptr == ':') {
-            cur = create_token(cur, COLON, ":");
+            cur = create_token(cur, COLON, ":", tok_line, tok_col);
+            col++;
             ptr++;
             continue;
         }
@@ -152,19 +164,22 @@ Token *lexer(const char *ptr, Token **head, Token *cur) {
         if (*ptr == ';') {
             // Skip comments
             while (*ptr && *ptr != '\n') {
+                col++;
                 ptr++;
             }
             continue;
         }
         
         if (*ptr == '.') {
-            cur = create_token(cur, PERIOD, ".");
+            cur = create_token(cur, PERIOD, ".", tok_line, tok_col);
+            col++;
             ptr++;
             continue;
         }
 
         if (*ptr == ',') {
-            cur = create_token(cur, COMMA, ",");
+            cur = create_token(cur, COMMA, ",", tok_line, tok_col);
+            col++;
             ptr++;
             continue;
         }
@@ -176,15 +191,17 @@ Token *lexer(const char *ptr, Token **head, Token *cur) {
         
             long value = strtol(buffer, NULL, 16);  // Convert hex string to integer
             
-            cur = create_token(cur, NUMBER, itostr(value));  // Store numeric value as string
+            cur = create_token(cur, NUMBER, itostr(value), tok_line, tok_col);  // Store numeric value as string
             ptr += strlen(buffer);
+            col += (int)strlen(buffer);
             continue;
         }        
 
         if (is_number(*ptr)) {
             readUntil(buffer, MAX_TOKEN_LEN, ptr, is_number);
-            cur = create_token(cur, NUMBER, buffer);
+            cur = create_token(cur, NUMBER, buffer, tok_line, tok_col);
             ptr += strlen(buffer);
+            col += (int)strlen(buffer);
             continue;
         }
 
@@ -192,35 +209,38 @@ Token *lexer(const char *ptr, Token **head, Token *cur) {
             readUntil(buffer, MAX_TOKEN_LEN, ptr + 1, is_number);
             long value = strtol(buffer, NULL, 10);  // Convert string to integer
             snprintf(buffer, MAX_TOKEN_LEN, "-%ld", value);  // Add negative sign
-            cur = create_token(cur, NEGATIVE_NUMBER, buffer);
+            cur = create_token(cur, NEGATIVE_NUMBER, buffer, tok_line, tok_col);
             ptr += strlen(buffer) + 1;  // Move past the number
+            col += (int)strlen(buffer) + 1;
             continue;
         }
 
         if (is_register(ptr, buffer)) {
-            cur = create_token(cur, REGISTER, buffer);
+            cur = create_token(cur, REGISTER, buffer, tok_line, tok_col);
             ptr += strlen(buffer);
+            col += (int)strlen(buffer);
             continue;
         }
 
-        if (is_alpha(*ptr) || *ptr == '_') {
+        Token *instTok = instruction(cur, ptr, tok_line, tok_col);
+        if (instTok) {
+            cur = instTok;
+            col += (int)strlen(instTok->str);
+            ptr += strlen(instTok->str);
+            continue;
+        }
 
-            Token *inst = instruction(cur, ptr);
-            if (inst) {
-                cur = inst;
-                ptr += strlen(cur->str);
-                continue;
-            }{
-            
+        if (is_alphaOrUnderbar(*ptr)) {
             readUntil(buffer, MAX_TOKEN_LEN, ptr, is_alphaOrUnderbarOrNumber);
-            cur = create_token(cur, LABEL, buffer);
+            cur = create_token(cur, LABEL, buffer, tok_line, tok_col);
             ptr += strlen(buffer);
+            col += (int)strlen(buffer);
             continue;
         }
 
-        fprintf(stderr, "Error: Unrecognized character '%c'\n", *ptr);
+        fprintf(stderr, "Unknown character at line %d col %d: %c\n", line, col, *ptr);
         exit(EXIT_FAILURE);
-        }
     }
+
     return cur;
 }
