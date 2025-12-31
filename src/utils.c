@@ -67,7 +67,7 @@ static const char* reg_name(uint8_t code) {
     }
 }
 
-static void print_instruction_list(const AsmInstr *inst_list, int indent) {
+static __attribute__((unused)) void print_instruction_list(const AsmInstr *inst_list, int indent) {
     for (const AsmInstr *n = inst_list; n; n = n->next) {
         const Instruction *inst = n->instruction;
         const char *mn = mnemonic_from_opcode(inst->base.opcode);

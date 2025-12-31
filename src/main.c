@@ -5,10 +5,12 @@
 
 #include "assembler.h"
 
-static void write_hex_dump(const char *bin_path, const uint8_t *buf, size_t size) {
+// Write hex dump to either a user-supplied path or, by default, alongside the
+// binary output inside the same directory (e.g., MyTester/outputs/<stem>.txt).
+static void write_hex_dump(const char *bin_path, const char *custom_path, const uint8_t *buf, size_t size) {
     if (!buf || size == 0) return;
 
-    // Derive build/<stem>.txt from the provided binary path
+    // Derive <dir>/<stem>.txt from the provided binary path
     const char *slash1 = strrchr(bin_path, '/');
     const char *slash2 = strrchr(bin_path, '\\');
     const char *base = bin_path;
@@ -25,7 +27,15 @@ static void write_hex_dump(const char *bin_path, const uint8_t *buf, size_t size
     if (dot) *dot = '\0';
 
     char out_path[512];
-    snprintf(out_path, sizeof(out_path), "%s.txt", stem[0] ? stem : "output");
+    if (custom_path && custom_path[0]) {
+        snprintf(out_path, sizeof(out_path), "%s", custom_path);
+    } else {
+        size_t dir_len = (size_t)(base - bin_path);
+        if (dir_len >= sizeof(out_path)) dir_len = sizeof(out_path) - 1;
+        memcpy(out_path, bin_path, dir_len);
+        out_path[dir_len] = '\0';
+        snprintf(out_path + dir_len, sizeof(out_path) - dir_len, "%s.txt", stem[0] ? stem : "output");
+    }
 
     FILE *txt = fopen(out_path, "w");
     if (!txt) {
@@ -58,11 +68,12 @@ static void write_hex_dump(const char *bin_path, const uint8_t *buf, size_t size
 
 int main(int argc, char *argv[]) {
     if (argc < 3) {
-        fprintf(stderr, "Usage: %s <input.asm> <output.bin>\n", argv[0]);
+        fprintf(stderr, "Usage: %s <input.asm> <output.bin> [hexdump.txt]\n", argv[0]);
         return 1;
     }
     const char *input_path = argv[1];
     const char *output_path = argv[2];
+    const char *hexdump_path = (argc >= 4) ? argv[3] : NULL;
 
     MachineCode mc = assembler(input_path, output_path);
 
@@ -76,8 +87,9 @@ int main(int argc, char *argv[]) {
     fwrite(mc.code, 1, mc.size, out);
     fclose(out);
 
-    // Also write a hex dump to <output-stem>.txt
-    write_hex_dump(output_path, mc.code, mc.size);
+    // Also write a hex dump. If a path is provided, use it; otherwise default
+    // to <output-dir>/<output-stem>.txt (e.g., MyTester/outputs/<stem>.txt).
+    write_hex_dump(output_path, hexdump_path, mc.code, mc.size);
     free(mc.code);
 
     return 0;
