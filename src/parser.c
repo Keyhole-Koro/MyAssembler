@@ -277,7 +277,7 @@ AsmBlock *label(Token **cur) {
         consume(cur);
         if ((*cur) == NULL) return NULL; // Handle end of tokens gracefully
 
-        while (*cur && (*cur)->type != EOF) {
+        while (*cur) {
             if ((*cur)->type == INSTRUCTION) {
                 AsmInstr *new_inst = instructions(cur);
                 label_inst_line->num_instrucitons++;
