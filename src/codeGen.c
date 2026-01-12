@@ -203,8 +203,8 @@ MachineCode codeGen(AsmBlock *head) {
 
         if (line->label && strlen(line->label) > 0) {
             mapLabelToAddress(&labelMap, line->label, pc);
-            // Export only function-level labels (prefixed with "f_") to the symbol table.
-            if (strncmp(line->label, "f_", 2) == 0) {
+            // Export function-level labels (prefixed with "f_") and __START__ to the symbol table.
+            if (strncmp(line->label, "f_", 2) == 0 || strcmp(line->label, "__START__") == 0) {
                 symbolvec_push(&symbols, line->label, 1 /*defined*/, 0 /*text*/, pc);
             }
             pc += (line->num_instrucitons) * sizeof(uint32_t);
