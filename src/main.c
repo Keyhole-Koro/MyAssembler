@@ -68,12 +68,22 @@ static void write_hex_dump(const char *bin_path, const char *custom_path, const 
 
 int main(int argc, char *argv[]) {
     if (argc < 3) {
-        fprintf(stderr, "Usage: %s <input.asm> <output.bin> [hexdump.txt]\n", argv[0]);
+        fprintf(stderr, "Usage: %s <input.asm> <output.bin> [hexdump.txt] [--obj <output.obj>]\n", argv[0]);
         return 1;
     }
     const char *input_path = argv[1];
     const char *output_path = argv[2];
-    const char *hexdump_path = (argc >= 4) ? argv[3] : NULL;
+    const char *hexdump_path = NULL;
+    const char *obj_path = NULL;
+
+    for (int i = 3; i < argc; ++i) {
+        if (strcmp(argv[i], "--obj") == 0 && i + 1 < argc) {
+            obj_path = argv[i + 1];
+            ++i;
+        } else if (!hexdump_path) {
+            hexdump_path = argv[i];
+        }
+    }
 
     MachineCode mc = assembler(input_path, output_path);
 
@@ -90,7 +100,17 @@ int main(int argc, char *argv[]) {
     // Also write a hex dump. If a path is provided, use it; otherwise default
     // to <output-dir>/<output-stem>.txt (e.g., MyTester/outputs/<stem>.txt).
     write_hex_dump(output_path, hexdump_path, mc.code, mc.size);
+
+    // Optionally emit .obj for linker use
+    if (obj_path) {
+        write_object(obj_path, &mc);
+    }
+
     free(mc.code);
+    for (size_t i = 0; i < mc.symbol_count; ++i) free(mc.symbols[i].name);
+    free(mc.symbols);
+    for (size_t i = 0; i < mc.reloc_count; ++i) free(mc.relocs[i].symbol_name);
+    free(mc.relocs);
 
     return 0;
 }

@@ -14,6 +14,18 @@ typedef struct {
     uint32_t address;
 } LabelAddressMapping;
 
+typedef struct {
+    ObjSymbol *items;
+    size_t count;
+    size_t cap;
+} SymbolVec;
+
+typedef struct {
+    ObjReloc *items;
+    size_t count;
+    size_t cap;
+} RelocVec;
+
 // A dynamic list of mappings
 typedef struct {
     LabelAddressMapping *entries;
@@ -43,6 +55,39 @@ void mapLabelToAddress(LabelMap *map, const char *label, uint32_t address) {
     map->entries[map->count].label = strdup(label);
     map->entries[map->count].address = address;
     map->count++;
+}
+
+static void symbolvec_push(SymbolVec *v, const char *name, uint32_t type, uint32_t section, uint32_t offset) {
+    if (v->count == v->cap) {
+        size_t new_cap = v->cap == 0 ? 8 : v->cap * 2;
+        v->items = realloc(v->items, new_cap * sizeof(ObjSymbol));
+        if (!v->items) {
+            perror("Failed to allocate symbol list");
+            exit(EXIT_FAILURE);
+        }
+        v->cap = new_cap;
+    }
+    v->items[v->count].name = strdup(name ? name : "");
+    v->items[v->count].type = type;
+    v->items[v->count].section = section;
+    v->items[v->count].offset = offset;
+    v->count++;
+}
+
+static void relocvec_push(RelocVec *v, uint32_t offset, const char *sym, uint32_t type) {
+    if (v->count == v->cap) {
+        size_t new_cap = v->cap == 0 ? 8 : v->cap * 2;
+        v->items = realloc(v->items, new_cap * sizeof(ObjReloc));
+        if (!v->items) {
+            perror("Failed to allocate relocation list");
+            exit(EXIT_FAILURE);
+        }
+        v->cap = new_cap;
+    }
+    v->items[v->count].offset = offset;
+    v->items[v->count].symbol_name = strdup(sym ? sym : "");
+    v->items[v->count].type = type;
+    v->count++;
 }
 
 // Optional: Lookup function
@@ -126,8 +171,8 @@ uint32_t encodeInstruction(LabelMap *map, AsmInstr *inst_list, uint32_t currentP
         case INSTR_REGLABEL: {
             uint32_t addr;
             if (!getLabelAddress(map, inst->reglabel.label, &addr)) {
-                fprintf(stderr, "Error: Label '%s' not found\n", inst->reglabel.label);
-                exit(EXIT_FAILURE);
+                // unresolved; caller will handle (placeholder)
+                return ENCODE(inst->reglabel.opcode, 26) | ENCODE(inst->reglabel.reg1, 21);
             }
             if (addr >= (1u << 21)) {
                 fprintf(stderr, "Error: Address 0x%X exceeds 21-bit immediate range for reg,label\n", addr);
@@ -147,6 +192,8 @@ uint32_t encodeInstruction(LabelMap *map, AsmInstr *inst_list, uint32_t currentP
 
 MachineCode codeGen(AsmBlock *head) {
     LabelMap labelMap;
+    SymbolVec symbols = {0};
+    RelocVec relocs = {0};
 
     initLabelMap(&labelMap);
 
@@ -156,6 +203,10 @@ MachineCode codeGen(AsmBlock *head) {
 
         if (line->label && strlen(line->label) > 0) {
             mapLabelToAddress(&labelMap, line->label, pc);
+            // Export only function-level labels (prefixed with "f_") to the symbol table.
+            if (strncmp(line->label, "f_", 2) == 0) {
+                symbolvec_push(&symbols, line->label, 1 /*defined*/, 0 /*text*/, pc);
+            }
             pc += (line->num_instrucitons) * sizeof(uint32_t);
             uint32_t data_bytes = (uint32_t)line->data_count;
             uint32_t padded_data = (data_bytes + 3u) & ~3u;
@@ -176,11 +227,25 @@ MachineCode codeGen(AsmBlock *head) {
         for (AsmInstr *inst = line->inst_list; inst; inst = inst->next) {
             uint32_t encoded;
             if (inst->needs_fixup) {
-                // Assume it's a label-based instruction
                 if (inst->kind == INSTR_LABEL) {
-                    encoded = encodeLabel(&labelMap, inst->instruction->label, pc);
+                    char *label = inst->instruction->label.label;
+                    uint32_t addr;
+                    if (getLabelAddress(&labelMap, label, &addr)) {
+                        encoded = encodeLabel(&labelMap, inst->instruction->label, pc);
+                    } else {
+                        // unresolved external: placeholder with opcode, record relative reloc
+                        encoded = ENCODE(inst->instruction->label.opcode, 26);
+                        relocvec_push(&relocs, pc, label, 1 /*RELATIVE*/);
+                    }
                 } else if (inst->kind == INSTR_REGLABEL) {
-                    encoded = encodeInstruction(&labelMap, inst, pc);
+                    char *label = inst->instruction->reglabel.label;
+                    uint32_t addr;
+                    if (getLabelAddress(&labelMap, label, &addr)) {
+                        encoded = encodeInstruction(&labelMap, inst, pc);
+                    } else {
+                        encoded = encodeInstruction(&labelMap, inst, pc); // returns opcode/reg, imm=0
+                        relocvec_push(&relocs, pc, label, 0 /*ABSOLUTE*/);
+                    }
                 } else {
                     encoded = encodeInstruction(&labelMap, inst, pc);
                 }
@@ -213,6 +278,12 @@ MachineCode codeGen(AsmBlock *head) {
         }
     }
 
-    MachineCode result = { .code = machineCode, .size = total_bytes };
+    MachineCode result = {0};
+    result.code = machineCode;
+    result.size = total_bytes;
+    result.symbols = symbols.items;
+    result.symbol_count = symbols.count;
+    result.relocs = relocs.items;
+    result.reloc_count = relocs.count;
     return result;
 }
