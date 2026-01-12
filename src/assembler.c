@@ -4,6 +4,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "ObjectFormat.h"
+
 Token *_lexer(const char *file_path) {
     FILE *file = fopen(file_path, "r");
     if (!file) {
@@ -31,7 +33,7 @@ MachineCode assembler(const char *file_path, const char *output_path) {
     Token *tokens = _lexer(file_path);
     if (!tokens) {
         fprintf(stderr, "No tokens found.\n");
-        return (MachineCode){NULL, 0};
+        return (MachineCode){NULL, 0, NULL, 0, NULL, 0};
     }
 
     AsmBlock *parsed = parser(tokens);
@@ -74,4 +76,49 @@ MachineCode assembler(const char *file_path, const char *output_path) {
     write_debug_report(out_path_buf, tokens, parsed);
 
     return codeGen(parsed);
+}
+
+void write_object(const char *obj_path, const MachineCode *mc) {
+    if (!obj_path || !mc) return;
+    FILE *f = fopen(obj_path, "wb");
+    if (!f) {
+        perror("Failed to open .obj file");
+        return;
+    }
+
+    struct FileHeader hdr = {0};
+    hdr.magic = LINKER_MAGIC;
+    hdr.text_size = (uint32_t)mc->size;
+    hdr.data_size = 0;
+    hdr.symtable_count = (uint32_t)mc->symbol_count;
+    hdr.reloc_count = (uint32_t)mc->reloc_count;
+    fwrite(&hdr, sizeof(hdr), 1, f);
+
+    // text section
+    fwrite(mc->code, 1, mc->size, f);
+
+    // no data section (yet)
+
+    // symbols
+    for (size_t i = 0; i < mc->symbol_count; ++i) {
+        struct SymbolEntry se = {0};
+        const ObjSymbol *src = &mc->symbols[i];
+        strncpy(se.name, src->name ? src->name : "", sizeof(se.name) - 1);
+        se.type = src->type;
+        se.section = src->section;
+        se.offset = src->offset;
+        fwrite(&se, sizeof(se), 1, f);
+    }
+
+    // relocs
+    for (size_t i = 0; i < mc->reloc_count; ++i) {
+        struct RelocEntry re = {0};
+        const ObjReloc *src = &mc->relocs[i];
+        re.offset = src->offset;
+        strncpy(re.symbol_name, src->symbol_name ? src->symbol_name : "", sizeof(re.symbol_name) - 1);
+        re.type = src->type;
+        fwrite(&re, sizeof(re), 1, f);
+    }
+
+    fclose(f);
 }
