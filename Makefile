@@ -1,5 +1,5 @@
 CC = gcc
-CFLAGS = -Iinc -I../MyLangLinker/inc -Wall -Wextra -g -fPIE
+CFLAGS = -Iinc -I../MyLinker/inc -Wall -Wextra -g -fPIE
 SRC = $(wildcard src/*.c) $(wildcard src/**/*.c)
 
 SRC_NO_MAIN = $(filter-out src/main.c, $(SRC))
