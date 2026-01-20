@@ -5,6 +5,7 @@ typedef enum {
     COLON = 1,
     COMMA,
     PERIOD,
+    IMPORT,
     IDENTIFIER,
     INSTRUCTION,
     REGISTER,

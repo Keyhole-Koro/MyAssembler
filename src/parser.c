@@ -7,6 +7,36 @@
 static const char *g_src_file = NULL;
 void parser_set_source_file(const char *path) { g_src_file = path; }
 
+static char **g_imports = NULL;
+static size_t g_import_count = 0;
+
+static void reset_imports(void) {
+    if (g_imports) {
+        for (size_t i = 0; i < g_import_count; i++) free(g_imports[i]);
+        free(g_imports);
+    }
+    g_imports = NULL;
+    g_import_count = 0;
+}
+
+static void add_import(const char *name) {
+    if (!name) return;
+    for (size_t i = 0; i < g_import_count; i++) {
+        if (strcmp(g_imports[i], name) == 0) return; // dedupe
+    }
+    g_imports = realloc(g_imports, sizeof(char*) * (g_import_count + 1));
+    if (!g_imports) {
+        fprintf(stderr, "Out of memory while adding import\n");
+        exit(EXIT_FAILURE);
+    }
+    g_imports[g_import_count++] = strdup(name);
+}
+
+const char **parser_get_imports(size_t *count) {
+    if (count) *count = g_import_count;
+    return (const char **)g_imports;
+}
+
 static void print_line_snippet(const char *file, int line, int col) {
     if (!file || line <= 0) return;
     FILE *fp = fopen(file, "r");
@@ -78,6 +108,24 @@ static void parse_byte_directive(Token **cur, AsmBlock *line) {
         line->data = realloc(line->data, n + 1);
         line->data[n] = b;
         line->data_count = n + 1;
+        consume(cur);
+        if (*cur && (*cur)->type == COMMA) { consume(cur); continue; }
+        break;
+    }
+    if (*cur && (*cur)->type == NEWLINE) { consume(cur); }
+}
+
+// Parse an 'import foo[,bar...]' line and record imported symbols.
+static void parse_import(Token **cur) {
+    if (!*cur || (*cur)->type != IMPORT) {
+        ERROR(*cur, "Expected 'import' keyword");
+    }
+    consume(cur); // consume 'import'
+    if (!*cur || (*cur)->type != LABEL) {
+        ERROR(*cur, "Expected symbol name after import");
+    }
+    while (*cur && (*cur)->type == LABEL) {
+        add_import((*cur)->str);
         consume(cur);
         if (*cur && (*cur)->type == COMMA) { consume(cur); continue; }
         break;
@@ -308,6 +356,7 @@ AsmBlock *label(Token **cur) {
 }
 
 AsmBlock *parser(Token *head) {
+    reset_imports();
     AsmBlock *head_label_inst_line = NULL;
     AsmBlock *cur_label_inst_line = NULL;
     cur_label_inst_line = head_label_inst_line;
@@ -317,6 +366,11 @@ AsmBlock *parser(Token *head) {
     while (*cur) {
         while (*cur && (*cur)->type == NEWLINE) consume(cur);
         if ((*cur)->type == 0) { consume(cur); continue; } // Skip
+
+        if ((*cur)->type == IMPORT) {
+            parse_import(cur);
+            continue;
+        }
 
         if ((*cur)->type == LABEL) {
             new_label = label(cur);

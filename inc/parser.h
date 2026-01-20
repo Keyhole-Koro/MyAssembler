@@ -17,6 +17,7 @@
 #define MAX_LABEL_LEN 32
 
 void parser_set_source_file(const char *path);
+const char **parser_get_imports(size_t *count);
 
 // Forward declaration for Encode (defined elsewhere)
 typedef struct Encode Encode;
