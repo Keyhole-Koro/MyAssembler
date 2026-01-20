@@ -23,6 +23,7 @@ const char* token_type_to_string(TokenType type) {
         case COLON:       return "COLON";
         case COMMA:       return "COMMA";
         case PERIOD:      return "PERIOD";
+        case IMPORT:      return "IMPORT";
         case IDENTIFIER:  return "IDENTIFIER";
         case INSTRUCTION: return "INSTRUCTION";
         case REGISTER:    return "REGISTER";

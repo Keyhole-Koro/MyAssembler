@@ -7,7 +7,7 @@
 #include <stdbool.h>
 #include "instructions.h"
 
-#define MAX_TOKEN_LEN 20
+#define MAX_TOKEN_LEN 128
 
 bool is_number(char c) {
     return c >= '0' && c <= '9';
@@ -116,6 +116,16 @@ bool is_register(const char *reg, char *buffer) {
         }
     }
     return false;
+}
+
+static void read_identifier(const char **ptr, char *buffer, int *col) {
+    int idx = 0;
+    while (**ptr && is_alphaOrUnderbarOrNumber(**ptr)) {
+        if (idx < MAX_TOKEN_LEN - 1) buffer[idx++] = **ptr;
+        (*ptr)++;
+        (*col)++;
+    }
+    buffer[idx] = '\0';
 }
 
 Token *lexer(const char *ptr, Token **head, Token *cur, int line) {
@@ -231,10 +241,12 @@ Token *lexer(const char *ptr, Token **head, Token *cur, int line) {
         }
 
         if (is_alphaOrUnderbar(*ptr)) {
-            readUntil(buffer, MAX_TOKEN_LEN, ptr, is_alphaOrUnderbarOrNumber);
-            cur = create_token(cur, LABEL, buffer, tok_line, tok_col);
-            ptr += strlen(buffer);
-            col += (int)strlen(buffer);
+            read_identifier(&ptr, buffer, &col);
+            if (strcmp(buffer, "import") == 0) {
+                cur = create_token(cur, IMPORT, buffer, tok_line, tok_col);
+            } else {
+                cur = create_token(cur, LABEL, buffer, tok_line, tok_col);
+            }
             continue;
         }
 

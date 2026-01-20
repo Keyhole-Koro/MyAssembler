@@ -26,6 +26,22 @@ typedef struct {
     size_t cap;
 } RelocVec;
 
+static int symbolvec_index(const SymbolVec *v, const char *name) {
+    if (!v || !name) return -1;
+    for (size_t i = 0; i < v->count; i++) {
+        if (strcmp(v->items[i].name, name) == 0) return (int)i;
+    }
+    return -1;
+}
+
+static bool is_imported(const char *name, const char **imports, size_t import_count) {
+    if (!name) return false;
+    for (size_t i = 0; i < import_count; i++) {
+        if (strcmp(imports[i], name) == 0) return true;
+    }
+    return false;
+}
+
 // A dynamic list of mappings
 typedef struct {
     LabelAddressMapping *entries;
@@ -190,7 +206,7 @@ uint32_t encodeInstruction(LabelMap *map, AsmInstr *inst_list, uint32_t currentP
     }
 }
 
-MachineCode codeGen(AsmBlock *head) {
+MachineCode codeGen(AsmBlock *head, const char **imports, size_t import_count) {
     LabelMap labelMap;
     SymbolVec symbols = {0};
     RelocVec relocs = {0};
@@ -215,6 +231,12 @@ MachineCode codeGen(AsmBlock *head) {
     }
 
     uint32_t total_bytes = pc; // total output size in bytes
+
+    // Record imported symbols as undefined in the symbol table (avoid duplicates)
+    for (size_t i = 0; i < import_count; i++) {
+        if (symbolvec_index(&symbols, imports[i]) >= 0) continue;
+        symbolvec_push(&symbols, imports[i], 0 /*undefined*/, 0 /*section*/, 0 /*offset*/);
+    }
     uint8_t *machineCode = malloc(total_bytes);
     if (!machineCode) {
         perror("Failed to allocate machine code buffer");
@@ -233,6 +255,10 @@ MachineCode codeGen(AsmBlock *head) {
                     if (getLabelAddress(&labelMap, label, &addr)) {
                         encoded = encodeLabel(&labelMap, inst->instruction->label, pc);
                     } else {
+                        if (!is_imported(label, imports, import_count)) {
+                            fprintf(stderr, "Undefined symbol '%s': not defined and not imported (add 'import %s')\n", label, label);
+                            exit(EXIT_FAILURE);
+                        }
                         // unresolved external: placeholder with opcode, record relative reloc
                         encoded = ENCODE(inst->instruction->label.opcode, 26);
                         relocvec_push(&relocs, pc, label, 1 /*RELATIVE*/);
@@ -243,6 +269,10 @@ MachineCode codeGen(AsmBlock *head) {
                     if (getLabelAddress(&labelMap, label, &addr)) {
                         encoded = encodeInstruction(&labelMap, inst, pc);
                     } else {
+                        if (!is_imported(label, imports, import_count)) {
+                            fprintf(stderr, "Undefined symbol '%s': not defined and not imported (add 'import %s')\n", label, label);
+                            exit(EXIT_FAILURE);
+                        }
                         encoded = encodeInstruction(&labelMap, inst, pc); // returns opcode/reg, imm=0
                         relocvec_push(&relocs, pc, label, 0 /*ABSOLUTE*/);
                     }
