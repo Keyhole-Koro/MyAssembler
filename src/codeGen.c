@@ -283,9 +283,11 @@ MachineCode codeGen(AsmBlock *head, const char **imports, size_t import_count) {
                 encoded = encodeInstruction(&labelMap, inst, pc);
             }
 
-            // Write 4 bytes in native endianness (consistent with prior uint32_t array write)
-            memcpy(machineCode + pc, &encoded, sizeof(uint32_t));
-            pc += 4;
+            // Write 4 bytes in Big Endian
+            machineCode[pc++] = (uint8_t)((encoded >> 24) & 0xFF);
+            machineCode[pc++] = (uint8_t)((encoded >> 16) & 0xFF);
+            machineCode[pc++] = (uint8_t)((encoded >> 8) & 0xFF);
+            machineCode[pc++] = (uint8_t)(encoded & 0xFF);
         }
 
         // Append raw data bytes if present
@@ -300,10 +302,10 @@ MachineCode codeGen(AsmBlock *head, const char **imports, size_t import_count) {
                         block[j] = encodeByte(line->data[idx]);
                     }
                 }
-                machineCode[pc++] = block[3];
-                machineCode[pc++] = block[2];
-                machineCode[pc++] = block[1];
                 machineCode[pc++] = block[0];
+                machineCode[pc++] = block[1];
+                machineCode[pc++] = block[2];
+                machineCode[pc++] = block[3];
             }
         }
     }
