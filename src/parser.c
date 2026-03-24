@@ -233,7 +233,13 @@ AsmInstr *instrRegAppears(Token **cur, Token *opcode, Token *reg1) {
             AsmInstr *instrList = malloc(sizeof(AsmInstr));
             InstrRegLabel *rl = malloc(sizeof(InstrRegLabel));
             instrList->kind = INSTR_REGLABEL;
-            rl->opcode = mapOpcode(opcode->str);
+            // For "mov reg, label" treat it as an address load using MOVI so the
+            // emulator decodes it with an immediate instead of a second register.
+            if (strcmp(opcode->str, "mov") == 0 || strcmp(opcode->str, "MOV") == 0) {
+                rl->opcode = opcode_from_mnemonic("movi");
+            } else {
+                rl->opcode = mapOpcode(opcode->str);
+            }
             rl->reg1 = mapRegister(reg1->str);
             rl->label = (*cur)->str;
             instrList->instruction = (Instruction *)rl;
