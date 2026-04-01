@@ -27,6 +27,9 @@ test: $(TEST_BIN)
 		$$test; \
 	done
 
+test-integration: $(TARGET)
+	python3 tests/run_integration_tests.py
+
 build/%: tests/%.c $(UNITY_SRC) $(OBJ_NO_MAIN)
 	mkdir -p build
 	$(CC) $(CFLAGS) $^ -o $@

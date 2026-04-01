@@ -1,0 +1,3 @@
+__START__:
+  movv r1, r2   ; unknown opcode triggers assembler error
+  halt

@@ -1,0 +1,69 @@
+
+__START__:
+; prologue
+  push bp
+  mov bp, sp
+  addis sp, -4
+  
+; load constant 10 into r1
+  movi  r1, 10
+  
+; store r1 to var 'x'
+  mov   r3, bp
+  addis r3, -4
+  mov r7, r3
+  store r3, r1
+  
+; address of 'x'
+  mov   r5, bp
+  addis r5, -4
+  call f_increment
+  
+; address of 'x'
+  mov   r5, bp
+  addis r5, -4
+  call f_increment
+  
+; load local 'x' into r1
+  mov   r3, bp
+  addis r3, -4
+  load  r1, r3
+  
+; return
+  addis sp, 4
+; epilogue
+  pop  bp
+  halt
+f_increment:
+; prologue
+  push bp
+  mov bp, sp
+  addis sp, -4
+  ; store parameter 'ptr' from register r5
+  mov   r3, bp
+  addis r3, -4
+  store   r3, r5
+  
+; load param 'ptr' (arg1, reg) into r3
+  mov   r3, bp
+  addis r3, -4
+  load  r3, r3
+  
+; load param 'ptr' (arg1, reg) into r2
+  mov   r3, bp
+  addis r3, -4
+  load  r2, r3
+  load r2, r2
+  
+; load constant 1 into r1
+  movi  r1, 1
+
+; addition
+  add  r1, r2
+  ; *ptr = value
+  load r3, r3
+  store r3, r1
+  addis sp, 4
+; epilogue
+  pop  bp
+  mov  pc, lr
