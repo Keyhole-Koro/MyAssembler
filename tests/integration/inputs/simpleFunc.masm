@@ -1,0 +1,622 @@
+
+__START__:
+; prologue
+  push bp
+  mov bp, sp
+  addis sp, -36
+  
+; load constant 2 into r1
+  movi  r1, 2
+  
+; store r1 to var 'x'
+  mov   r3, bp
+  addis r3, -4
+  store r3, r1
+  
+; load constant 3 into r1
+  movi  r1, 3
+  
+; store r1 to var 'y'
+  mov   r3, bp
+  addis r3, -8
+  store r3, r1
+  
+; load local 'x' into r5
+  mov   r3, bp
+  addis r3, -4
+  load  r5, r3
+  
+; load local 'y' into r6
+  mov   r3, bp
+  addis r3, -8
+  load  r6, r3
+  call f_test_eq
+  
+; store r1 to var 'eq'
+  mov   r3, bp
+  addis r3, -12
+  store r3, r1
+  
+; load local 'x' into r5
+  mov   r3, bp
+  addis r3, -4
+  load  r5, r3
+  
+; load local 'y' into r6
+  mov   r3, bp
+  addis r3, -8
+  load  r6, r3
+  call f_test_neq
+  
+; store r1 to var 'neq'
+  mov   r3, bp
+  addis r3, -16
+  store r3, r1
+  
+; load local 'x' into r5
+  mov   r3, bp
+  addis r3, -4
+  load  r5, r3
+  
+; load local 'y' into r6
+  mov   r3, bp
+  addis r3, -8
+  load  r6, r3
+  call f_test_lt
+  
+; store r1 to var 'lt'
+  mov   r3, bp
+  addis r3, -20
+  store r3, r1
+  
+; load local 'x' into r5
+  mov   r3, bp
+  addis r3, -4
+  load  r5, r3
+  
+; load local 'y' into r6
+  mov   r3, bp
+  addis r3, -8
+  load  r6, r3
+  call f_test_lte
+  
+; store r1 to var 'lte'
+  mov   r3, bp
+  addis r3, -24
+  store r3, r1
+  
+; load local 'x' into r5
+  mov   r3, bp
+  addis r3, -4
+  load  r5, r3
+  
+; load local 'y' into r6
+  mov   r3, bp
+  addis r3, -8
+  load  r6, r3
+  call f_test_gt
+  
+; store r1 to var 'gt'
+  mov   r3, bp
+  addis r3, -28
+  store r3, r1
+  
+; load local 'x' into r5
+  mov   r3, bp
+  addis r3, -4
+  load  r5, r3
+  
+; load local 'y' into r6
+  mov   r3, bp
+  addis r3, -8
+  load  r6, r3
+  call f_test_gte
+  
+; store r1 to var 'gte'
+  mov   r3, bp
+  addis r3, -32
+  store r3, r1
+  
+; load local 'x' into r2
+  mov   r3, bp
+  addis r3, -4
+  load  r2, r3
+  
+; load constant 9 into r3
+  movi  r3, 9
+  cmp r2, r3
+  jg b_L_then_0
+  jmp b_L_end_0
+b_L_then_0:
+  
+; load local 'x' into r2
+  mov   r3, bp
+  addis r3, -4
+  load  r2, r3
+  
+; load constant 1 into r1
+  movi  r1, 1
+
+; addition
+  add  r1, r2
+  
+; store r1 to var 'x'
+  mov   r3, bp
+  addis r3, -4
+  store r3, r1
+  jmp b_L_end_0
+b_L_end_0:
+  
+; load local 'x' into r5
+  mov   r3, bp
+  addis r3, -4
+  load  r5, r3
+  
+; load local 'y' into r6
+  mov   r3, bp
+  addis r3, -8
+  load  r6, r3
+  
+; load constant 10 into r7
+  movi  r7, 10
+  call f_add3
+  
+; store r1 to var 'z'
+  mov   r3, bp
+  addis r3, -36
+  store r3, r1
+  
+; load local 'eq' into r1
+  mov   r3, bp
+  addis r3, -12
+  load  r1, r3
+  
+; return
+  addis sp, 36
+; epilogue
+  pop  bp
+  halt
+f_test_eq:
+; prologue
+  push bp
+  mov bp, sp
+  addis sp, -12
+  ; store parameter 'a' from register r5
+  mov   r3, bp
+  addis r3, -4
+  store r3, r5
+  ; store parameter 'b' from register r6
+  mov   r3, bp
+  addis r3, -8
+  store r3, r6
+  
+; load constant 0 into r1
+  movi  r1, 0
+  
+; store r1 to var 'r'
+  mov   r3, bp
+  addis r3, -4
+  store r3, r1
+  
+; load param 'a' (arg1, reg) into r2
+  mov   r3, bp
+  addis r3, -4
+  load  r2, r3
+  
+; load param 'b' (arg2, reg) into r3
+  mov   r3, bp
+  addis r3, -8
+  load  r3, r3
+  cmp r2, r3
+  jz b_L_then_1
+  jmp b_L_else_1
+b_L_then_1:
+  
+; load constant 10 into r1
+  movi  r1, 10
+  
+; store r1 to var 'r'
+  mov   r3, bp
+  addis r3, -4
+  store r3, r1
+  jmp b_L_end_1
+b_L_else_1:
+  
+; load constant 11 into r1
+  movi  r1, 11
+  
+; store r1 to var 'r'
+  mov   r3, bp
+  addis r3, -4
+  store r3, r1
+b_L_end_1:
+  
+; load local 'r' into r1
+  mov   r3, bp
+  addis r3, -4
+  load  r1, r3
+  
+; return
+  addis sp, 12
+; epilogue
+  pop  bp
+  mov  pc, lr
+
+f_test_neq:
+; prologue
+  debug
+  push bp
+  mov bp, sp
+  addis sp, -12
+  ; store parameter 'a' from register r5
+  mov   r3, bp
+  addis r3, -4
+  store r3, r5
+  ; store parameter 'b' from register r6
+  mov   r3, bp
+  addis r3, -8
+  store r3, r6
+  
+; load constant 0 into r1
+  movi  r1, 0
+  
+; store r1 to var 'r'
+  mov   r3, bp
+  addis r3, -4
+  store r3, r1
+  
+; load param 'a' (arg1, reg) into r2
+  mov   r3, bp
+  addis r3, -4
+  load  r2, r3
+  
+; load param 'b' (arg2, reg) into r3
+  mov   r3, bp
+  addis r3, -8
+  load  r3, r3
+  cmp r2, r3
+  jnz b_L_then_2
+  jmp b_L_else_2
+b_L_then_2:
+  
+; load constant 20 into r1
+  movi  r1, 20
+  
+; store r1 to var 'r'
+  mov   r3, bp
+  addis r3, -4
+  store r3, r1
+  jmp b_L_end_2
+b_L_else_2:
+  
+; load constant 21 into r1
+  movi  r1, 21
+  
+; store r1 to var 'r'
+  mov   r3, bp
+  addis r3, -4
+  store r3, r1
+b_L_end_2:
+  
+; load local 'r' into r1
+  mov   r3, bp
+  addis r3, -4
+  load  r1, r3
+  
+; return
+  addis sp, 12
+  debug
+; epilogue
+  pop  bp
+  debug
+  mov  pc, lr
+
+f_test_lt:
+; prologue
+  push bp
+  mov bp, sp
+  addis sp, -12
+  ; store parameter 'a' from register r5
+  mov   r3, bp
+  addis r3, -4
+  store r3, r5
+  ; store parameter 'b' from register r6
+  mov   r3, bp
+  addis r3, -8
+  store r3, r6
+  
+; load constant 0 into r1
+  movi  r1, 0
+  
+; store r1 to var 'r'
+  mov   r3, bp
+  addis r3, -4
+  store r3, r1
+  
+; load param 'a' (arg1, reg) into r2
+  mov   r3, bp
+  addis r3, -4
+  load  r2, r3
+  
+; load param 'b' (arg2, reg) into r3
+  mov   r3, bp
+  addis r3, -8
+  load  r3, r3
+  cmp r2, r3
+  jl b_L_then_3
+  jmp b_L_else_3
+b_L_then_3:
+  
+; load constant 30 into r1
+  movi  r1, 30
+  
+; store r1 to var 'r'
+  mov   r3, bp
+  addis r3, -4
+  store r3, r1
+  jmp b_L_end_3
+b_L_else_3:
+  
+; load constant 31 into r1
+  movi  r1, 31
+  
+; store r1 to var 'r'
+  mov   r3, bp
+  addis r3, -4
+  store r3, r1
+b_L_end_3:
+  
+; load local 'r' into r1
+  mov   r3, bp
+  addis r3, -4
+  load  r1, r3
+  
+; return
+  addis sp, 12
+; epilogue
+  pop  bp
+  mov  pc, lr
+
+f_test_lte:
+; prologue
+  push bp
+  mov bp, sp
+  addis sp, -12
+  ; store parameter 'a' from register r5
+  mov   r3, bp
+  addis r3, -4
+  store r3, r5
+  ; store parameter 'b' from register r6
+  mov   r3, bp
+  addis r3, -8
+  store r3, r6
+  
+; load constant 0 into r1
+  movi  r1, 0
+  
+; store r1 to var 'r'
+  mov   r3, bp
+  addis r3, -4
+  store r3, r1
+  
+; load param 'a' (arg1, reg) into r2
+  mov   r3, bp
+  addis r3, -4
+  load  r2, r3
+  
+; load param 'b' (arg2, reg) into r3
+  mov   r3, bp
+  addis r3, -8
+  load  r3, r3
+  cmp r2, r3
+  jg b_L_else_4
+  jmp b_L_then_4
+b_L_then_4:
+  
+; load constant 40 into r1
+  movi  r1, 40
+  
+; store r1 to var 'r'
+  mov   r3, bp
+  addis r3, -4
+  store r3, r1
+  jmp b_L_end_4
+b_L_else_4:
+  
+; load constant 41 into r1
+  movi  r1, 41
+  
+; store r1 to var 'r'
+  mov   r3, bp
+  addis r3, -4
+  store r3, r1
+b_L_end_4:
+  
+; load local 'r' into r1
+  mov   r3, bp
+  addis r3, -4
+  load  r1, r3
+  
+; return
+  addis sp, 12
+; epilogue
+  pop  bp
+  mov  pc, lr
+
+f_test_gt:
+; prologue
+  push bp
+  mov bp, sp
+  addis sp, -12
+  ; store parameter 'a' from register r5
+  mov   r3, bp
+  addis r3, -4
+  store r3, r5
+  ; store parameter 'b' from register r6
+  mov   r3, bp
+  addis r3, -8
+  store r3, r6
+  
+; load constant 0 into r1
+  movi  r1, 0
+  
+; store r1 to var 'r'
+  mov   r3, bp
+  addis r3, -4
+  store r3, r1
+  
+; load param 'a' (arg1, reg) into r2
+  mov   r3, bp
+  addis r3, -4
+  load  r2, r3
+  
+; load param 'b' (arg2, reg) into r3
+  mov   r3, bp
+  addis r3, -8
+  load  r3, r3
+  cmp r2, r3
+  jg b_L_then_5
+  jmp b_L_else_5
+b_L_then_5:
+  
+; load constant 50 into r1
+  movi  r1, 50
+  
+; store r1 to var 'r'
+  mov   r3, bp
+  addis r3, -4
+  store r3, r1
+  jmp b_L_end_5
+b_L_else_5:
+  
+; load constant 51 into r1
+  movi  r1, 51
+  
+; store r1 to var 'r'
+  mov   r3, bp
+  addis r3, -4
+  store r3, r1
+b_L_end_5:
+  
+; load local 'r' into r1
+  mov   r3, bp
+  addis r3, -4
+  load  r1, r3
+  
+; return
+  addis sp, 12
+; epilogue
+  pop  bp
+  mov  pc, lr
+
+f_test_gte:
+; prologue
+  push bp
+  mov bp, sp
+  addis sp, -12
+  ; store parameter 'a' from register r5
+  mov   r3, bp
+  addis r3, -4
+  store r3, r5
+  ; store parameter 'b' from register r6
+  mov   r3, bp
+  addis r3, -8
+  store r3, r6
+  
+; load constant 0 into r1
+  movi  r1, 0
+  
+; store r1 to var 'r'
+  mov   r3, bp
+  addis r3, -4
+  store r3, r1
+  
+; load param 'a' (arg1, reg) into r2
+  mov   r3, bp
+  addis r3, -4
+  load  r2, r3
+  
+; load param 'b' (arg2, reg) into r3
+  mov   r3, bp
+  addis r3, -8
+  load  r3, r3
+  cmp r2, r3
+  jl b_L_else_6
+  jmp b_L_then_6
+b_L_then_6:
+  
+; load constant 60 into r1
+  movi  r1, 60
+  
+; store r1 to var 'r'
+  mov   r3, bp
+  addis r3, -4
+  store r3, r1
+  jmp b_L_end_6
+b_L_else_6:
+  
+; load constant 61 into r1
+  movi  r1, 61
+  
+; store r1 to var 'r'
+  mov   r3, bp
+  addis r3, -4
+  store r3, r1
+b_L_end_6:
+  
+; load local 'r' into r1
+  mov   r3, bp
+  addis r3, -4
+  load  r1, r3
+  
+; return
+  addis sp, 12
+; epilogue
+  pop  bp
+  mov  pc, lr
+
+f_add3:
+; prologue
+  push bp
+  mov bp, sp
+  addis sp, -12
+  ; store parameter 'a' from register r5
+  mov   r3, bp
+  addis r3, -4
+  store r3, r5
+  ; store parameter 'b' from register r6
+  mov   r3, bp
+  addis r3, -8
+  store r3, r6
+  ; store parameter 'c' from register r7
+  mov   r3, bp
+  addis r3, -12
+  store r3, r7
+  
+; load param 'a' (arg1, reg) into r2
+  mov   r3, bp
+  addis r3, -4
+  load  r2, r3
+  
+; load param 'b' (arg2, reg) into r1
+  mov   r3, bp
+  addis r3, -8
+  load  r1, r3
+
+; addition
+  add  r1, r2
+  mov r2, r1
+  
+; load param 'c' (arg3, reg) into r1
+  mov   r3, bp
+  addis r3, -12
+  load  r1, r3
+
+; addition
+  add  r1, r2
+  
+; return
+  addis sp, 12
+; epilogue
+  pop  bp
+  mov  pc, lr

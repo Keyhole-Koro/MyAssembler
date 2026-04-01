@@ -1,0 +1,43 @@
+
+__START__:
+; prologue
+  push bp
+  mov bp, sp
+  addis sp, -8
+  mov  r1, s_0
+  
+; store r1 to var 'hello'
+  mov   r3, bp
+  addis r3, -4
+  store r3, r1
+  
+; load char 88 into r1
+  movi  r1, 88
+  
+; store r1 to var 'c'
+  mov   r3, bp
+  addis r3, -8
+  storeb r3, r1
+  
+; load local 'hello' into r2
+  mov   r3, bp
+  addis r3, -4
+  load r2, r3
+  
+; load constant 0 into r1
+  movi  r1, 0
+
+; addition
+  add  r1, r2
+  mov r3, r1
+  ; dereference *expr
+  loadb r1, r3
+  
+; return
+  addis sp, 8
+; epilogue
+  pop  bp
+  halt
+; data
+s_0:
+  .byte 0x48, 0x65, 0x6C, 0x6C, 0x6F, 0x00
