@@ -121,15 +121,34 @@ static void parse_import(Token **cur) {
         ERROR(*cur, "Expected 'import' keyword");
     }
     consume(cur); // consume 'import'
+
+    int has_braces = 0;
+    if (*cur && (*cur)->type == L_BRACE) {
+        has_braces = 1;
+        consume(cur);
+    }
+
     if (!*cur || (*cur)->type != LABEL) {
         ERROR(*cur, "Expected symbol name after import");
     }
+
     while (*cur && (*cur)->type == LABEL) {
         add_import((*cur)->str);
         consume(cur);
-        if (*cur && (*cur)->type == COMMA) { consume(cur); continue; }
+        if (*cur && (*cur)->type == COMMA) {
+            consume(cur);
+            continue;
+        }
         break;
     }
+
+    if (has_braces) {
+        if (!*cur || (*cur)->type != R_BRACE) {
+            ERROR(*cur, "Expected '}' after import list");
+        }
+        consume(cur);
+    }
+
     if (*cur && (*cur)->type == FROM) {
         consume(cur);
         if (!*cur || (*cur)->type != STRING_LITERAL) {

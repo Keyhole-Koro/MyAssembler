@@ -1,0 +1,6 @@
+import { f_add_two } from "importFrom_helper.masm"
+
+__START__:
+  movi r5, 9
+  call f_add_two
+  halt

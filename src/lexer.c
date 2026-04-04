@@ -194,6 +194,20 @@ Token *lexer(const char *ptr, Token **head, Token *cur, int line) {
             continue;
         }
 
+        if (*ptr == '{') {
+            cur = create_token(cur, L_BRACE, "{", tok_line, tok_col);
+            col++;
+            ptr++;
+            continue;
+        }
+
+        if (*ptr == '}') {
+            cur = create_token(cur, R_BRACE, "}", tok_line, tok_col);
+            col++;
+            ptr++;
+            continue;
+        }
+
         if (*ptr == '"') {
             ptr++;
             col++;
