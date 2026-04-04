@@ -1,0 +1,9 @@
+f_read_b:
+  push lr
+  movi r3, s_0
+  loadb r1, r3
+  pop lr
+  mov pc, lr
+
+s_0:
+  .byte 22, 0

@@ -40,6 +40,9 @@
 /build/
 /bin/
 /obj/
+/tests/outputs/
 
 # Dependency files
-*.d
+*.dassembler
+
+assembler

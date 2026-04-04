@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <assert.h>
 #include <string.h>
+#include <ctype.h>
 
 #define ENCODE(op, shift) ((uint32_t)(op) << (shift))
 
@@ -49,7 +50,24 @@ typedef struct {
     size_t capacity;
 } LabelMap;
 
+typedef struct {
+    char *source_label;
+    char *symbol_name;
+} LabelSymbolMapping;
+
+typedef struct {
+    LabelSymbolMapping *entries;
+    size_t count;
+    size_t capacity;
+} LabelSymbolMap;
+
 void initLabelMap(LabelMap *map) {
+    map->entries = NULL;
+    map->count = 0;
+    map->capacity = 0;
+}
+
+static void initLabelSymbolMap(LabelSymbolMap *map) {
     map->entries = NULL;
     map->count = 0;
     map->capacity = 0;
@@ -71,6 +89,38 @@ void mapLabelToAddress(LabelMap *map, const char *label, uint32_t address) {
     map->entries[map->count].label = strdup(label);
     map->entries[map->count].address = address;
     map->count++;
+}
+
+static bool is_public_label(const char *label) {
+    if (!label) return false;
+    return strncmp(label, "f_", 2) == 0 || strcmp(label, "__START__") == 0;
+}
+
+static void labelsymbolmap_put(LabelSymbolMap *map, const char *source_label, const char *symbol_name) {
+    if (map->count == map->capacity) {
+        size_t new_capacity = map->capacity == 0 ? 8 : map->capacity * 2;
+        map->entries = realloc(map->entries, new_capacity * sizeof(LabelSymbolMapping));
+        if (!map->entries) {
+            perror("Failed to allocate memory for label symbol map");
+            exit(EXIT_FAILURE);
+        }
+        map->capacity = new_capacity;
+    }
+
+    map->entries[map->count].source_label = strdup(source_label);
+    map->entries[map->count].symbol_name = strdup(symbol_name);
+    map->count++;
+}
+
+// slow linear search
+static const char *labelsymbolmap_get(const LabelSymbolMap *map, const char *source_label) {
+    if (!map || !source_label) return NULL;
+    for (size_t i = 0; i < map->count; ++i) {
+        if (strcmp(map->entries[i].source_label, source_label) == 0) {
+            return map->entries[i].symbol_name;
+        }
+    }
+    return NULL;
 }
 
 static void symbolvec_push(SymbolVec *v, const char *name, uint32_t type, uint32_t section, uint32_t offset) {
@@ -206,22 +256,50 @@ uint32_t encodeInstruction(LabelMap *map, AsmInstr *inst_list, uint32_t currentP
     }
 }
 
-MachineCode codeGen(AsmBlock *head, const char **imports, size_t import_count) {
+static void build_module_tag(const char *module_tag, char *out, size_t out_size) {
+    const char *base = module_tag ? module_tag : "obj";
+    const char *slash = strrchr(base, '/');
+    const char *backslash = strrchr(base, '\\');
+    if (slash && backslash) base = (slash > backslash) ? slash + 1 : backslash + 1;
+    else if (slash) base = slash + 1;
+    else if (backslash) base = backslash + 1;
+
+    size_t len = 0;
+    while (base[len] && base[len] != '.' && len + 1 < out_size) {
+        unsigned char ch = (unsigned char)base[len];
+        out[len] = (isalnum(ch) || ch == '_') ? (char)ch : '_';
+        len++;
+    }
+    out[len] = '\0';
+    if (len == 0) snprintf(out, out_size, "obj");
+}
+
+MachineCode codeGen(AsmBlock *head, const char **imports, size_t import_count, const char *module_tag) {
     LabelMap labelMap;
+    LabelSymbolMap labelSymbolMap;
     SymbolVec symbols = {0};
     RelocVec relocs = {0};
+    char module_name[32];
 
     initLabelMap(&labelMap);
+    initLabelSymbolMap(&labelSymbolMap);
+    build_module_tag(module_tag, module_name, sizeof(module_name));
 
     // First pass: assign addresses to labels
     uint32_t pc = 0;
+    uint32_t local_label_counter = 1;
     for (AsmBlock *line = head; line; line = line->next) {
 
         if (line->label && strlen(line->label) > 0) {
             mapLabelToAddress(&labelMap, line->label, pc);
-            // Export function-level labels (prefixed with "f_") and __START__ to the symbol table.
-            if (strncmp(line->label, "f_", 2) == 0 || strcmp(line->label, "__START__") == 0) {
+            if (is_public_label(line->label)) {
+                labelsymbolmap_put(&labelSymbolMap, line->label, line->label);
                 symbolvec_push(&symbols, line->label, 1 /*defined*/, 0 /*text*/, pc);
+            } else {
+                char unique_name[96];
+                snprintf(unique_name, sizeof(unique_name), "%s-[%s:%u]", line->label, module_name, local_label_counter++);
+                labelsymbolmap_put(&labelSymbolMap, line->label, unique_name);
+                symbolvec_push(&symbols, unique_name, 1 /*defined*/, 0 /*text*/, pc);
             }
             pc += (line->num_instrucitons) * sizeof(uint32_t);
             uint32_t data_bytes = (uint32_t)line->data_count;
@@ -266,15 +344,18 @@ MachineCode codeGen(AsmBlock *head, const char **imports, size_t import_count) {
                 } else if (inst->kind == INSTR_REGLABEL) {
                     char *label = inst->instruction->reglabel.label;
                     uint32_t addr;
+                    const char *symbol_name = labelsymbolmap_get(&labelSymbolMap, label);
+                    if (!symbol_name) symbol_name = label;
                     if (getLabelAddress(&labelMap, label, &addr)) {
                         encoded = encodeInstruction(&labelMap, inst, pc);
+                        relocvec_push(&relocs, pc, symbol_name, 0 /*ABSOLUTE*/);
                     } else {
                         if (!is_imported(label, imports, import_count)) {
                             fprintf(stderr, "Undefined symbol '%s': not defined and not imported (add 'import %s')\n", label, label);
                             exit(EXIT_FAILURE);
                         }
                         encoded = encodeInstruction(&labelMap, inst, pc); // returns opcode/reg, imm=0
-                        relocvec_push(&relocs, pc, label, 0 /*ABSOLUTE*/);
+                        relocvec_push(&relocs, pc, symbol_name, 0 /*ABSOLUTE*/);
                     }
                 } else {
                     encoded = encodeInstruction(&labelMap, inst, pc);
