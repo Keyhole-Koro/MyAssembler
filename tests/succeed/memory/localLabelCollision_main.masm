@@ -1,0 +1,9 @@
+import { f_read_a } from "localLabelCollision_a.masm"
+import { f_read_b } from "localLabelCollision_b.masm"
+
+__START__:
+  call f_read_a
+  mov r6, r1
+  call f_read_b
+  add r1, r6
+  halt

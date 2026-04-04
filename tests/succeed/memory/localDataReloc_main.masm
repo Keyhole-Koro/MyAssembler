@@ -1,0 +1,5 @@
+import { f_read_byte } from "localDataReloc_helper.masm"
+
+__START__:
+  call f_read_byte
+  halt

@@ -9,14 +9,16 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 PROJECT_ROOT = REPO_ROOT.parents[1]
-INPUT_DIR = REPO_ROOT / "tests" / "integration" / "inputs"
+TESTS_DIR = REPO_ROOT / "tests"
 ASM_PATH = REPO_ROOT / "build" / "myas"
 LINKER_PATH = PROJECT_ROOT / "toolchain" / "MyLinker" / "mllinker"
 EMU_PATH = PROJECT_ROOT / "runtime" / "MyEmulator" / "build" / "myemu"
 
 TESTCASES = [
-    ("simpleChar", ["simpleChar.masm"], "R1", 72),
-    ("importFrom", ["importFrom_main.masm", "importFrom_helper.masm"], "R1", 11),
+    ("simpleChar", ["succeed/memory/simpleChar.masm"], "R1", 72),
+    ("importFrom", ["succeed/function/importFrom_main.masm", "succeed/function/importFrom_helper.masm"], "R1", 11),
+    ("localDataReloc", ["succeed/memory/localDataReloc_main.masm", "succeed/memory/localDataReloc_helper.masm"], "R1", 77),
+    ("localLabelCollision", ["succeed/memory/localLabelCollision_main.masm", "succeed/memory/localLabelCollision_a.masm", "succeed/memory/localLabelCollision_b.masm"], "R1", 42),
 ]
 VERBOSE = False
 
@@ -65,9 +67,9 @@ def run_tests(selected=None):
             linked_bin = case_dir / f"{basename}.bin"
             try:
                 obj_paths = []
-                for src_name in sources:
-                    asm_path = INPUT_DIR / src_name
-                    stem = Path(src_name).stem
+                for src_rel in sources:
+                    asm_path = TESTS_DIR / src_rel
+                    stem = Path(src_rel).stem
                     prelink_bin = case_dir / f"{stem}.prelink.bin"
                     obj_path = case_dir / f"{stem}.mobj"
                     run([str(ASM_PATH), str(asm_path), str(prelink_bin), "--obj", str(obj_path)], cwd=case_dir)
