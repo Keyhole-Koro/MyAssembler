@@ -6,6 +6,8 @@ typedef enum {
     COMMA,
     PERIOD,
     IMPORT,
+    FROM,
+    STRING_LITERAL,
     IDENTIFIER,
     INSTRUCTION,
     REGISTER,

@@ -194,6 +194,26 @@ Token *lexer(const char *ptr, Token **head, Token *cur, int line) {
             continue;
         }
 
+        if (*ptr == '"') {
+            ptr++;
+            col++;
+            int idx = 0;
+            while (*ptr && *ptr != '"') {
+                if (idx < MAX_TOKEN_LEN - 1) buffer[idx++] = *ptr;
+                ptr++;
+                col++;
+            }
+            buffer[idx] = '\0';
+            if (*ptr != '"') {
+                fprintf(stderr, "Unterminated string literal at line %d col %d\n", tok_line, tok_col);
+                exit(EXIT_FAILURE);
+            }
+            ptr++;
+            col++;
+            cur = create_token(cur, STRING_LITERAL, buffer, tok_line, tok_col);
+            continue;
+        }
+
         if (is_hex(ptr)) {
             buffer[0] = '0';
             buffer[1] = 'x';
@@ -244,6 +264,8 @@ Token *lexer(const char *ptr, Token **head, Token *cur, int line) {
             read_identifier(&ptr, buffer, &col);
             if (strcmp(buffer, "import") == 0) {
                 cur = create_token(cur, IMPORT, buffer, tok_line, tok_col);
+            } else if (strcmp(buffer, "from") == 0) {
+                cur = create_token(cur, FROM, buffer, tok_line, tok_col);
             } else {
                 cur = create_token(cur, LABEL, buffer, tok_line, tok_col);
             }
