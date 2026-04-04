@@ -24,6 +24,8 @@ const char* token_type_to_string(TokenType type) {
         case COMMA:       return "COMMA";
         case PERIOD:      return "PERIOD";
         case IMPORT:      return "IMPORT";
+        case FROM:        return "FROM";
+        case STRING_LITERAL:return "STRING_LITERAL";
         case IDENTIFIER:  return "IDENTIFIER";
         case INSTRUCTION: return "INSTRUCTION";
         case REGISTER:    return "REGISTER";

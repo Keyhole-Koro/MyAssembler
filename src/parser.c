@@ -130,6 +130,13 @@ static void parse_import(Token **cur) {
         if (*cur && (*cur)->type == COMMA) { consume(cur); continue; }
         break;
     }
+    if (*cur && (*cur)->type == FROM) {
+        consume(cur);
+        if (!*cur || (*cur)->type != STRING_LITERAL) {
+            ERROR(*cur, "Expected file path string after from");
+        }
+        consume(cur);
+    }
     if (*cur && (*cur)->type == NEWLINE) { consume(cur); }
 }
 
