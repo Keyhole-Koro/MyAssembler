@@ -1,0 +1,7 @@
+f_add_two:
+  push lr
+  mov  r1, r5
+  movi r2, 2
+  add  r1, r2
+  pop  lr
+  mov  pc, lr

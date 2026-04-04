@@ -5,6 +5,8 @@ typedef enum {
     COLON = 1,
     COMMA,
     PERIOD,
+    L_BRACE,
+    R_BRACE,
     IMPORT,
     FROM,
     STRING_LITERAL,

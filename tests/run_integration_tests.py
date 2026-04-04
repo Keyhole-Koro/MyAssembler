@@ -11,10 +11,12 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 PROJECT_ROOT = REPO_ROOT.parents[1]
 INPUT_DIR = REPO_ROOT / "tests" / "integration" / "inputs"
 ASM_PATH = REPO_ROOT / "build" / "myas"
+LINKER_PATH = PROJECT_ROOT / "toolchain" / "MyLinker" / "mllinker"
 EMU_PATH = PROJECT_ROOT / "runtime" / "MyEmulator" / "build" / "myemu"
 
 TESTCASES = [
-    ("simpleChar", "R1", 72),
+    ("simpleChar", ["simpleChar.masm"], "R1", 72),
+    ("importFrom", ["importFrom_main.masm", "importFrom_helper.masm"], "R1", 11),
 ]
 VERBOSE = False
 
@@ -32,9 +34,10 @@ def run(command, cwd=None):
 
 
 def build_all():
-    status_line("SETUP", "build assembler and emulator")
+    status_line("SETUP", "build assembler, linker, and emulator")
     for cmd, desc in [
         (["make", "-C", str(REPO_ROOT), "all"], "Build MyAssembler"),
+        (["make", "-C", str(PROJECT_ROOT / 'toolchain' / 'MyLinker'), "all"], "Build MyLinker"),
         (["make", "-C", str(PROJECT_ROOT / 'runtime' / 'MyEmulator'), "all"], "Build MyEmulator"),
     ]:
         result = subprocess.run(cmd, check=False, capture_output=True, text=True)
@@ -56,14 +59,22 @@ def run_tests(selected=None):
     temp_root = Path(tempfile.mkdtemp(prefix="myassembler-integration-tests-"))
     failures = []
     try:
-        for basename, reg, expected in cases:
+        for basename, sources, reg, expected in cases:
             case_dir = temp_root / basename
             case_dir.mkdir(parents=True, exist_ok=True)
-            asm_path = INPUT_DIR / f"{basename}.masm"
-            bin_path = case_dir / f"{basename}.bin"
+            linked_bin = case_dir / f"{basename}.bin"
             try:
-                run([str(ASM_PATH), str(asm_path), str(bin_path)], cwd=case_dir)
-                output = run([str(EMU_PATH), "-i", str(bin_path), "--reg", reg], cwd=case_dir).stdout
+                obj_paths = []
+                for src_name in sources:
+                    asm_path = INPUT_DIR / src_name
+                    stem = Path(src_name).stem
+                    prelink_bin = case_dir / f"{stem}.prelink.bin"
+                    obj_path = case_dir / f"{stem}.mobj"
+                    run([str(ASM_PATH), str(asm_path), str(prelink_bin), "--obj", str(obj_path)], cwd=case_dir)
+                    obj_paths.append(str(obj_path))
+
+                run([str(LINKER_PATH), str(linked_bin)] + obj_paths, cwd=case_dir)
+                output = run([str(EMU_PATH), "-i", str(linked_bin), "--reg", reg], cwd=case_dir).stdout
                 lines = [line.strip() for line in output.splitlines() if line.strip()]
                 actual = int(lines[-1], 0)
                 if actual != expected:
