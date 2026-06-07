@@ -43,6 +43,14 @@ static bool is_imported(const char *name, const char **imports, size_t import_co
     return false;
 }
 
+static bool is_exported(const char *name, const char **exports, size_t export_count) {
+    if (!name) return false;
+    for (size_t i = 0; i < export_count; i++) {
+        if (strcmp(exports[i], name) == 0) return true;
+    }
+    return false;
+}
+
 // A dynamic list of mappings
 typedef struct {
     LabelAddressMapping *entries;
@@ -274,7 +282,7 @@ static void build_module_tag(const char *module_tag, char *out, size_t out_size)
     if (len == 0) snprintf(out, out_size, "obj");
 }
 
-MachineCode codeGen(AsmBlock *head, const char **imports, size_t import_count, const char *module_tag) {
+MachineCode codeGen(AsmBlock *head, const char **imports, size_t import_count, const char **exports, size_t export_count, const char *module_tag) {
     LabelMap labelMap;
     LabelSymbolMap labelSymbolMap;
     SymbolVec symbols = {0};
@@ -292,7 +300,7 @@ MachineCode codeGen(AsmBlock *head, const char **imports, size_t import_count, c
 
         if (line->label && strlen(line->label) > 0) {
             mapLabelToAddress(&labelMap, line->label, pc);
-            if (is_public_label(line->label)) {
+            if (is_public_label(line->label) || is_exported(line->label, exports, export_count)) {
                 labelsymbolmap_put(&labelSymbolMap, line->label, line->label);
                 symbolvec_push(&symbols, line->label, 1 /*defined*/, 0 /*text*/, pc);
             } else {
@@ -309,6 +317,14 @@ MachineCode codeGen(AsmBlock *head, const char **imports, size_t import_count, c
     }
 
     uint32_t total_bytes = pc; // total output size in bytes
+
+    for (size_t i = 0; i < export_count; i++) {
+        uint32_t addr;
+        if (!getLabelAddress(&labelMap, exports[i], &addr)) {
+            fprintf(stderr, "Exported symbol '%s' is not defined in this file\n", exports[i]);
+            exit(EXIT_FAILURE);
+        }
+    }
 
     // Record imported symbols as undefined in the symbol table (avoid duplicates)
     for (size_t i = 0; i < import_count; i++) {

@@ -1,0 +1,6 @@
+import { add_two } from "exportFrom_helper.masm"
+
+__START__:
+  movi r5, 9
+  call add_two
+  halt

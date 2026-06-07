@@ -77,7 +77,9 @@ MachineCode assembler(const char *file_path, const char *output_path) {
 
     size_t import_count = 0;
     const char **imports = parser_get_imports(&import_count);
-    return codeGen(parsed, imports, import_count, file_path);
+    size_t export_count = 0;
+    const char **exports = parser_get_exports(&export_count);
+    return codeGen(parsed, imports, import_count, exports, export_count, file_path);
 }
 
 void write_object(const char *obj_path, const MachineCode *mc) {

@@ -9,32 +9,61 @@ void parser_set_source_file(const char *path) { g_src_file = path; }
 
 static char **g_imports = NULL;
 static size_t g_import_count = 0;
+static char **g_exports = NULL;
+static size_t g_export_count = 0;
 
-static void reset_imports(void) {
+static void reset_symbols(void) {
     if (g_imports) {
         for (size_t i = 0; i < g_import_count; i++) free(g_imports[i]);
         free(g_imports);
     }
     g_imports = NULL;
     g_import_count = 0;
+    if (g_exports) {
+        for (size_t i = 0; i < g_export_count; i++) free(g_exports[i]);
+        free(g_exports);
+    }
+    g_exports = NULL;
+    g_export_count = 0;
+}
+
+static void add_symbol_name(char ***items, size_t *count, const char *name, const char *what) {
+    if (!name) return;
+    for (size_t i = 0; i < *count; i++) {
+        if (strcmp((*items)[i], name) == 0) return; // dedupe
+    }
+    *items = realloc(*items, sizeof(char*) * (*count + 1));
+    if (!*items) {
+        fprintf(stderr, "Out of memory while adding %s\n", what);
+        exit(EXIT_FAILURE);
+    }
+    (*items)[(*count)++] = strdup(name);
 }
 
 static void add_import(const char *name) {
-    if (!name) return;
-    for (size_t i = 0; i < g_import_count; i++) {
-        if (strcmp(g_imports[i], name) == 0) return; // dedupe
-    }
-    g_imports = realloc(g_imports, sizeof(char*) * (g_import_count + 1));
-    if (!g_imports) {
-        fprintf(stderr, "Out of memory while adding import\n");
-        exit(EXIT_FAILURE);
-    }
-    g_imports[g_import_count++] = strdup(name);
+    add_symbol_name(&g_imports, &g_import_count, name, "import");
+}
+
+static void add_export(const char *name) {
+    add_symbol_name(&g_exports, &g_export_count, name, "export");
 }
 
 const char **parser_get_imports(size_t *count) {
     if (count) *count = g_import_count;
     return (const char **)g_imports;
+}
+
+const char **parser_get_exports(size_t *count) {
+    if (count) *count = g_export_count;
+    return (const char **)g_exports;
+}
+
+static int is_symbol_token(Token *tok) {
+    return tok && (tok->type == LABEL || tok->type == INSTRUCTION);
+}
+
+static int is_label_declaration(Token *tok) {
+    return is_symbol_token(tok) && tok->next && tok->next->type == COLON;
 }
 
 static void print_line_snippet(const char *file, int line, int col) {
@@ -128,11 +157,11 @@ static void parse_import(Token **cur) {
         consume(cur);
     }
 
-    if (!*cur || (*cur)->type != LABEL) {
+    if (!is_symbol_token(*cur)) {
         ERROR(*cur, "Expected symbol name after import");
     }
 
-    while (*cur && (*cur)->type == LABEL) {
+    while (is_symbol_token(*cur)) {
         add_import((*cur)->str);
         consume(cur);
         if (*cur && (*cur)->type == COMMA) {
@@ -156,6 +185,43 @@ static void parse_import(Token **cur) {
         }
         consume(cur);
     }
+    if (*cur && (*cur)->type == NEWLINE) { consume(cur); }
+}
+
+// Parse an 'export foo[,bar...]' line and record public symbols.
+static void parse_export(Token **cur) {
+    if (!*cur || (*cur)->type != EXPORT) {
+        ERROR(*cur, "Expected 'export' keyword");
+    }
+    consume(cur); // consume 'export'
+
+    int has_braces = 0;
+    if (*cur && (*cur)->type == L_BRACE) {
+        has_braces = 1;
+        consume(cur);
+    }
+
+    if (!is_symbol_token(*cur)) {
+        ERROR(*cur, "Expected symbol name after export");
+    }
+
+    while (is_symbol_token(*cur)) {
+        add_export((*cur)->str);
+        consume(cur);
+        if (*cur && (*cur)->type == COMMA) {
+            consume(cur);
+            continue;
+        }
+        break;
+    }
+
+    if (has_braces) {
+        if (!*cur || (*cur)->type != R_BRACE) {
+            ERROR(*cur, "Expected '}' after export list");
+        }
+        consume(cur);
+    }
+
     if (*cur && (*cur)->type == NEWLINE) { consume(cur); }
 }
 
@@ -254,7 +320,7 @@ AsmInstr *instrRegAppears(Token **cur, Token *opcode, Token *reg1) {
             Token *imm21 = *cur; // Save the immediate value
             consume(cur);
             return instrRegImm21(opcode, reg1, imm21);
-        } else if ((*cur)->type == LABEL && (*cur)->next != NULL && (*cur)->next->type != COLON) {
+        } else if (is_symbol_token(*cur) && (*cur)->next != NULL && (*cur)->next->type != COLON) {
             // reg, label -> treat as immediate fixup for label address
             AsmInstr *instrList = malloc(sizeof(AsmInstr));
             InstrRegLabel *rl = malloc(sizeof(InstrRegLabel));
@@ -320,7 +386,7 @@ AsmInstr *instructions(Token **cur) {
             consume(cur);
             return instrImm26(opcode, imm26);
             
-        } else if (*cur && (*cur)->type == LABEL
+        } else if (is_symbol_token(*cur)
             // messy code
             // Check if the current token is a not label declaration
             && (*cur)->next != NULL
@@ -358,6 +424,7 @@ AsmBlock *label(Token **cur) {
         if ((*cur) == NULL) return NULL; // Handle end of tokens gracefully
 
         while (*cur) {
+            if (is_label_declaration(*cur)) { break; }
             if ((*cur)->type == INSTRUCTION) {
                 AsmInstr *new_inst = instructions(cur);
                 label_inst_line->num_instrucitons++;
@@ -376,7 +443,6 @@ AsmBlock *label(Token **cur) {
                 continue;
             }
             if ((*cur)->type == NEWLINE) { consume(cur); continue; }
-            if ((*cur)->type == LABEL && (*cur)->next && (*cur)->next->type == COLON) { break; }
             ERROR(*cur, "Unexpected token in label block: %s\n", token_type_to_string((*cur)->type));
         }
     } else {
@@ -388,7 +454,7 @@ AsmBlock *label(Token **cur) {
 }
 
 AsmBlock *parser(Token *head) {
-    reset_imports();
+    reset_symbols();
     AsmBlock *head_label_inst_line = NULL;
     AsmBlock *cur_label_inst_line = NULL;
     cur_label_inst_line = head_label_inst_line;
@@ -403,8 +469,12 @@ AsmBlock *parser(Token *head) {
             parse_import(cur);
             continue;
         }
+        if ((*cur)->type == EXPORT) {
+            parse_export(cur);
+            continue;
+        }
 
-        if ((*cur)->type == LABEL) {
+        if (is_label_declaration(*cur)) {
             new_label = label(cur);
         /*
         } else if ((*cur)->type == INSTRUCTION) {
