@@ -20,14 +20,12 @@ jobs:
     steps:
       - name: Checkout MyAssembler
         uses: actions/checkout@v4
-        with:
-          path: toolchain/MyAssembler
 
       - name: Checkout MyLinker
         uses: actions/checkout@v4
         with:
           repository: Keyhole-Koro/MyLinker
-          path: toolchain/MyLinker
+          path: MyLinker
 
       - name: Checkout MyEmulator
         uses: actions/checkout@v4
