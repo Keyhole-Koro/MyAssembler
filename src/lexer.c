@@ -278,6 +278,8 @@ Token *lexer(const char *ptr, Token **head, Token *cur, int line) {
             read_identifier(&ptr, buffer, &col);
             if (strcmp(buffer, "import") == 0) {
                 cur = create_token(cur, IMPORT, buffer, tok_line, tok_col);
+            } else if (strcmp(buffer, "export") == 0) {
+                cur = create_token(cur, EXPORT, buffer, tok_line, tok_col);
             } else if (strcmp(buffer, "from") == 0) {
                 cur = create_token(cur, FROM, buffer, tok_line, tok_col);
             } else {

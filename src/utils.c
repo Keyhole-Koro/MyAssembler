@@ -26,6 +26,7 @@ const char* token_type_to_string(TokenType type) {
         case L_BRACE:     return "L_BRACE";
         case R_BRACE:     return "R_BRACE";
         case IMPORT:      return "IMPORT";
+        case EXPORT:      return "EXPORT";
         case FROM:        return "FROM";
         case STRING_LITERAL:return "STRING_LITERAL";
         case IDENTIFIER:  return "IDENTIFIER";

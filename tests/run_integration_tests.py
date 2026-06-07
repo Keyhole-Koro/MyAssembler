@@ -17,6 +17,7 @@ EMU_PATH = PROJECT_ROOT / "runtime" / "MyEmulator" / "build" / "myemu"
 TESTCASES = [
     ("simpleChar", ["succeed/memory/simpleChar.masm"], "R1", 72),
     ("importFrom", ["succeed/function/importFrom_main.masm", "succeed/function/importFrom_helper.masm"], "R1", 11),
+    ("exportFrom", ["succeed/function/exportFrom_main.masm", "succeed/function/exportFrom_helper.masm"], "R1", 11),
     ("localDataReloc", ["succeed/memory/localDataReloc_main.masm", "succeed/memory/localDataReloc_helper.masm"], "R1", 77),
     ("localLabelCollision", ["succeed/memory/localLabelCollision_main.masm", "succeed/memory/localLabelCollision_a.masm", "succeed/memory/localLabelCollision_b.masm"], "R1", 42),
 ]

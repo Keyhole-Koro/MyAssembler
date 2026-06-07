@@ -8,6 +8,7 @@ typedef enum {
     L_BRACE,
     R_BRACE,
     IMPORT,
+    EXPORT,
     FROM,
     STRING_LITERAL,
     IDENTIFIER,
