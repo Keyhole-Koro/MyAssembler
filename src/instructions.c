@@ -46,6 +46,11 @@ const InstructionDef instruction_table[] = {
     {"in",    0x16},
     {"out",   0x17},
 
+    // interrupts
+    {"ei",    0x1E},
+    {"di",    0x1F},
+    {"iret",  0x20},
+
     // special
     {"halt",  0x3F},
     {"debug", 0x1A},
