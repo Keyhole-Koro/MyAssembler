@@ -12,11 +12,6 @@ jobs:
   test:
     runs-on: ubuntu-latest
 
-    defaults:
-      run:
-        shell: bash
-        working-directory: toolchain/MyAssembler
-
     steps:
       - name: Checkout MyAssembler
         uses: actions/checkout@v4
@@ -25,13 +20,13 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: Keyhole-Koro/MyLinker
-          path: MyLinker
+          path: ../MyLinker
 
       - name: Checkout MyEmulator
         uses: actions/checkout@v4
         with:
           repository: Keyhole-Koro/MyEmulator
-          path: runtime/MyEmulator
+          path: ../runtime/MyEmulator
 
       - name: Set up Python
         uses: actions/setup-python@v5
