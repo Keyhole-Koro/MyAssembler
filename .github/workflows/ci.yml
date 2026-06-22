@@ -15,19 +15,19 @@ jobs:
     defaults:
       run:
         shell: bash
-        working-directory: MyAssembler
+        working-directory: toolchain/MyAssembler
 
     steps:
       - name: Checkout MyAssembler
         uses: actions/checkout@v4
         with:
-          path: MyAssembler
+          path: toolchain/MyAssembler
 
       - name: Checkout MyLinker
         uses: actions/checkout@v4
         with:
           repository: Keyhole-Koro/MyLinker
-          path: MyLinker
+          path: toolchain/MyLinker
 
       - name: Checkout MyEmulator
         uses: actions/checkout@v4
