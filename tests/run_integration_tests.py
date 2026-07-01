@@ -80,7 +80,7 @@ def run_tests(selected=None):
                     obj_paths.append(str(obj_path))
 
                 run([str(LINKER_PATH), str(linked_bin)] + obj_paths, cwd=case_dir)
-                output = run([str(EMU_PATH), "-i", str(linked_bin), "--reg", reg], cwd=case_dir).stdout
+                output = run([str(EMU_PATH), "-i", str(linked_bin), "--headless", "--reg", reg], cwd=case_dir).stdout
                 lines = [line.strip() for line in output.splitlines() if line.strip()]
                 actual = int(lines[-1], 0)
                 if actual != expected:
