@@ -13,7 +13,10 @@ Token *_lexer(const char *file_path) {
         exit(EXIT_FAILURE);
     }
 
-    char buffer[256];
+    // Generated `.byte` lines for string literals run ~6 chars per byte, so a
+    // long UI string easily exceeds a small line buffer. A too-short buffer
+    // splits a line mid-token and corrupts the stream, so keep this generous.
+    char buffer[8192];
     Token *head = NULL;
     Token *cur = NULL;
 
