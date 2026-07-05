@@ -12,7 +12,7 @@ PROJECT_ROOT = REPO_ROOT.parents[1]
 TESTS_DIR = REPO_ROOT / "tests"
 ASM_PATH = REPO_ROOT / "build" / "myas"
 LINKER_PATH = PROJECT_ROOT / "toolchain" / "MyLinker" / "mllinker"
-EMU_PATH = PROJECT_ROOT / "runtime" / "MyEmulator" / "build" / "myemu"
+EMU_PATH = PROJECT_ROOT / "runtime" / "MyEmulator" / "target" / "release" / "myemu"
 
 TESTCASES = [
     ("simpleChar", ["succeed/memory/simpleChar.masm"], "R1", 72),
