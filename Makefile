@@ -30,6 +30,8 @@ test: $(TEST_BIN)
 test-integration: $(TARGET)
 	python3 tests/run_integration_tests.py
 
+test-all: test test-integration
+
 build/%: tests/%.c $(UNITY_SRC) $(OBJ_NO_MAIN)
 	mkdir -p build
 	$(CC) $(CFLAGS) $^ -o $@
@@ -44,4 +46,4 @@ clean:
 	rm -f $(OBJ) $(TARGET) $(TEST_BIN)
 	rm -rf build
 
-.PHONY: all clean test run gdb
+.PHONY: all clean test test-integration test-all run-myas gdb
