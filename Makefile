@@ -27,10 +27,14 @@ test: $(TEST_BIN)
 		$$test; \
 	done
 
-test-integration: $(TARGET)
+test-e2e: $(TARGET)
 	python3 tests/run_integration_tests.py
 
-test-all: test test-integration
+# Backward-compatible alias. This suite uses the linker and emulator.
+test-integration: test-e2e
+
+# Tests owned by and executable within the assembler repository.
+test-all: test
 
 build/%: tests/%.c $(UNITY_SRC) $(OBJ_NO_MAIN)
 	mkdir -p build
@@ -46,4 +50,4 @@ clean:
 	rm -f $(OBJ) $(TARGET) $(TEST_BIN)
 	rm -rf build
 
-.PHONY: all clean test test-integration test-all run-myas gdb
+.PHONY: all clean test test-e2e test-integration test-all run-myas gdb
