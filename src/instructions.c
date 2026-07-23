@@ -50,6 +50,7 @@ const InstructionDef instruction_table[] = {
     {"ei",    0x1E},
     {"di",    0x1F},
     {"iret",  0x20},
+    {"wfi",   0x21},
 
     // special
     {"halt",  0x3F},
