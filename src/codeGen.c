@@ -185,7 +185,25 @@ uint32_t encodeRegReg(InstrRegReg instr) {
 }
 
 uint32_t encodeRegImm21(InstrRegImm21 instr) {
-    assert(instr.reg1 < 32 && (instr.imm21 >> 21) == 0);
+    // An out-of-range immediate is a real input error, not an internal
+    // inconsistency: it means the caller emitted something like
+    // `movi r1, 0xDEADBEEF`, which this encoding has no room for. Report it
+    // as such rather than aborting on an assert with no context, which gives
+    // the caller a SIGABRT and no idea which instruction was at fault.
+    if (instr.reg1 >= 32) {
+        fprintf(stderr,
+                "error: register index %u is out of range (max 31)\n",
+                (unsigned)instr.reg1);
+        exit(1);
+    }
+    if ((instr.imm21 >> 21) != 0) {
+        fprintf(stderr,
+                "error: immediate 0x%X does not fit in the 21 bits this "
+                "instruction encodes (max 0x1FFFFF)\n"
+                "  a wider constant has to be loaded from memory instead\n",
+                instr.imm21);
+        exit(1);
+    }
     return ENCODE(instr.opcode, 26) | ENCODE(instr.reg1, 21) | ENCODE(instr.imm21 & 0x1FFFFF, 0);
 }
 
