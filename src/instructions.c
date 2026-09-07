@@ -53,6 +53,7 @@ const InstructionDef instruction_table[] = {
     {"wfi",   0x21},
 
     // special
+    {"syscall", 0x3E},
     {"halt",  0x3F},
     {"debug", 0x1A},
 };
