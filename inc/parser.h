@@ -107,6 +107,13 @@ struct AsmInstr {
 
 // Labeled block containing instructions and optional data
 typedef struct AsmBlock AsmBlock;
+// One `.word` operand: a 32-bit value, or a symbol whose final address the
+// linker writes there (a RELOC_WORD32 relocation).
+typedef struct {
+    uint32_t value;
+    char *symbol;   // NULL for a plain number
+} AsmWord;
+
 struct AsmBlock {
     char *label; // Empty string if no label
     int num_instrucitons; // Number of instructions
@@ -114,6 +121,12 @@ struct AsmBlock {
     // Data payload for this label (from directives like .byte)
     unsigned char *data; // raw bytes
     size_t data_count;   // number of bytes
+    // Word payload (from .word), laid out after the padded bytes
+    AsmWord *words;
+    size_t word_count;
+    // Named collected section this block's payload belongs to (from a
+    // preceding `.section name`), or NULL for ordinary text/data.
+    char *section;
     AsmBlock *next; // Pointer to the next labeled block
 };
 

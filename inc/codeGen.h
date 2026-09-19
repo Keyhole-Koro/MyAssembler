@@ -22,6 +22,12 @@ typedef struct {
 } ObjReloc;
 
 typedef struct {
+    char *name;           // section name
+    uint32_t offset;      // chunk offset in text
+    uint32_t size;        // chunk size in bytes
+} ObjCollect;
+
+typedef struct {
     uint8_t *code; // raw bytes (text section)
     size_t size;   // number of bytes
 
@@ -30,6 +36,10 @@ typedef struct {
 
     ObjReloc *relocs;
     size_t reloc_count;
+
+    // Chunks of named collected sections (see ObjectFormat.h CollectEntry).
+    ObjCollect *collects;
+    size_t collect_count;
 } MachineCode;
 
 // Encode a single data byte (mask to 8 bits)

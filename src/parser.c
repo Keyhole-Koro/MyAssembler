@@ -121,9 +121,39 @@ void consume(Token **cur) {
     *cur = next;
 }
 
+// Parse a '.word' directive: 32-bit values or symbols, comma separated. A
+// symbol operand is emitted as a placeholder the linker fills with the
+// symbol's final address (RELOC_WORD32), which is what lets data hold
+// pointers to strings, functions and other data.
+static void parse_word_directive(Token **cur, AsmBlock *line) {
+    consume(cur); // consume 'word'
+    while (*cur) {
+        AsmWord w = {0, NULL};
+        if ((*cur)->type == NUMBER || (*cur)->type == NEGATIVE_NUMBER) {
+            w.value = (uint32_t)strtol((*cur)->str, NULL, 0);
+        } else if (is_symbol_token(*cur)) {
+            w.symbol = (*cur)->str;
+        } else {
+            break;
+        }
+        size_t n = line->word_count;
+        line->words = realloc(line->words, sizeof(AsmWord) * (n + 1));
+        line->words[n] = w;
+        line->word_count = n + 1;
+        consume(cur);
+        if (*cur && (*cur)->type == COMMA) { consume(cur); continue; }
+        break;
+    }
+    if (*cur && (*cur)->type == NEWLINE) { consume(cur); }
+}
+
 // Parse a '.byte' directive sequence and append data bytes to the given label line.
 static void parse_byte_directive(Token **cur, AsmBlock *line) {
     // Current token should be the identifier following '.'
+    if (*cur && (*cur)->type == LABEL && strcmp((*cur)->str, "word") == 0) {
+        parse_word_directive(cur, line);
+        return;
+    }
     if (!*cur || (*cur)->type != LABEL || strcmp((*cur)->str, "byte") != 0) {
         ERROR(*cur, "Unknown directive after '.': %s\n", (*cur) ? (*cur)->str : "<eof>");
     }
@@ -415,6 +445,9 @@ AsmBlock *label(Token **cur) {
     label_inst_line->inst_list = NULL; // Initialize the list of instructions pointer to NULL
     label_inst_line->data = NULL;
     label_inst_line->data_count = 0;
+    label_inst_line->words = NULL;
+    label_inst_line->word_count = 0;
+    label_inst_line->section = NULL;
     label_inst_line->next = NULL; // Initialize the next pointer to NULL
     
     AsmInstr *cur_inst = label_inst_line->inst_list;
@@ -438,6 +471,8 @@ AsmBlock *label(Token **cur) {
                 continue;
             }
             if ((*cur)->type == PERIOD) {
+                // `.section` starts a new block: leave it to the top level.
+                if ((*cur)->next && (*cur)->next->type == LABEL && strcmp((*cur)->next->str, "section") == 0) break;
                 consume(cur);
                 parse_byte_directive(cur, label_inst_line);
                 continue;
@@ -460,6 +495,7 @@ AsmBlock *parser(Token *head) {
     cur_label_inst_line = head_label_inst_line;
 
     AsmBlock *new_label = NULL;
+    char *pending_section = NULL; // from `.section name`, applied to the next block
     Token **cur = &head;
     while (*cur) {
         while (*cur && (*cur)->type == NEWLINE) consume(cur);
@@ -473,9 +509,24 @@ AsmBlock *parser(Token *head) {
             parse_export(cur);
             continue;
         }
+        // `.section name`: the next label block's data is one chunk of the
+        // named collected section (ObjectFormat.h, CollectEntry).
+        if ((*cur)->type == PERIOD && (*cur)->next && (*cur)->next->type == LABEL &&
+            strcmp((*cur)->next->str, "section") == 0) {
+            consume(cur);
+            consume(cur);
+            if (!*cur || !is_symbol_token(*cur)) {
+                ERROR(*cur, "Expected a section name after '.section'\n");
+            }
+            pending_section = (*cur)->str;
+            consume(cur);
+            continue;
+        }
 
         if (is_label_declaration(*cur)) {
             new_label = label(cur);
+            new_label->section = pending_section;
+            pending_section = NULL;
         /*
         } else if ((*cur)->type == INSTRUCTION) {
             new_label = instructions(cur);

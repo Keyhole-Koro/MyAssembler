@@ -305,6 +305,8 @@ MachineCode codeGen(AsmBlock *head, const char **imports, size_t import_count, c
     LabelSymbolMap labelSymbolMap;
     SymbolVec symbols = {0};
     RelocVec relocs = {0};
+    ObjCollect *collects = NULL;
+    size_t collect_count = 0;
     char module_name[32];
 
     initLabelMap(&labelMap);
@@ -330,7 +332,21 @@ MachineCode codeGen(AsmBlock *head, const char **imports, size_t import_count, c
             pc += (line->num_instrucitons) * sizeof(uint32_t);
             uint32_t data_bytes = (uint32_t)line->data_count;
             uint32_t padded_data = (data_bytes + 3u) & ~3u;
-            pc += padded_data; // account for data bytes (word-aligned for loader)
+            uint32_t payload = padded_data + (uint32_t)line->word_count * sizeof(uint32_t);
+            if (line->section) {
+                // The block's payload is one chunk of a collected section.
+                if (line->num_instrucitons > 0) {
+                    fprintf(stderr, "'.section %s' block '%s' must hold only data (.byte/.word), not instructions\n",
+                            line->section, line->label);
+                    exit(EXIT_FAILURE);
+                }
+                collects = realloc(collects, sizeof(ObjCollect) * (collect_count + 1));
+                collects[collect_count].name = line->section;
+                collects[collect_count].offset = pc;
+                collects[collect_count].size = payload;
+                collect_count++;
+            }
+            pc += payload; // data bytes (word-aligned for loader) and words
         }
     }
 
@@ -423,6 +439,30 @@ MachineCode codeGen(AsmBlock *head, const char **imports, size_t import_count, c
                 machineCode[pc++] = block[3];
             }
         }
+
+        // Append .word payload: big-endian like everything else in memory.
+        // A symbol word is written as 0 and patched by the linker with the
+        // symbol's final address, in full (RELOC_WORD32).
+        for (size_t i = 0; i < line->word_count; ++i) {
+            const AsmWord *w = &line->words[i];
+            uint32_t value = w->value;
+            if (w->symbol) {
+                uint32_t addr;
+                const char *symbol_name = labelsymbolmap_get(&labelSymbolMap, w->symbol);
+                if (!symbol_name) symbol_name = w->symbol;
+                if (!getLabelAddress(&labelMap, w->symbol, &addr) &&
+                    !is_imported(w->symbol, imports, import_count)) {
+                    fprintf(stderr, "Undefined symbol '%s' in .word: not defined and not imported (add 'import %s')\n", w->symbol, w->symbol);
+                    exit(EXIT_FAILURE);
+                }
+                relocvec_push(&relocs, pc, symbol_name, 2 /*WORD32*/);
+                value = 0;
+            }
+            machineCode[pc++] = (uint8_t)((value >> 24) & 0xFF);
+            machineCode[pc++] = (uint8_t)((value >> 16) & 0xFF);
+            machineCode[pc++] = (uint8_t)((value >> 8) & 0xFF);
+            machineCode[pc++] = (uint8_t)(value & 0xFF);
+        }
     }
 
     MachineCode result = {0};
@@ -432,5 +472,7 @@ MachineCode codeGen(AsmBlock *head, const char **imports, size_t import_count, c
     result.symbol_count = symbols.count;
     result.relocs = relocs.items;
     result.reloc_count = relocs.count;
+    result.collects = collects;
+    result.collect_count = collect_count;
     return result;
 }
