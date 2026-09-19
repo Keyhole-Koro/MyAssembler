@@ -148,7 +148,7 @@ static void symbolvec_push(SymbolVec *v, const char *name, uint32_t type, uint32
     v->count++;
 }
 
-static void relocvec_push(RelocVec *v, uint32_t offset, const char *sym, uint32_t type) {
+static void relocvec_push(RelocVec *v, uint32_t offset, const char *sym, uint32_t type, uint32_t section) {
     if (v->count == v->cap) {
         size_t new_cap = v->cap == 0 ? 8 : v->cap * 2;
         v->items = realloc(v->items, new_cap * sizeof(ObjReloc));
@@ -161,6 +161,7 @@ static void relocvec_push(RelocVec *v, uint32_t offset, const char *sym, uint32_
     v->items[v->count].offset = offset;
     v->items[v->count].symbol_name = strdup(sym ? sym : "");
     v->items[v->count].type = type;
+    v->items[v->count].section = section;
     v->count++;
 }
 
@@ -313,44 +314,55 @@ MachineCode codeGen(AsmBlock *head, const char **imports, size_t import_count, c
     initLabelSymbolMap(&labelSymbolMap);
     build_module_tag(module_tag, module_name, sizeof(module_name));
 
-    // First pass: assign addresses to labels
+    // First pass: assign addresses to labels. A `.section` block's payload
+    // goes to the collected-section blob, a separate address space the
+    // linker relocates chunk by chunk; everything else is TEXT.
     uint32_t pc = 0;
+    uint32_t blob_pc = 0;
     uint32_t local_label_counter = 1;
     for (AsmBlock *line = head; line; line = line->next) {
 
         if (line->label && strlen(line->label) > 0) {
-            mapLabelToAddress(&labelMap, line->label, pc);
-            if (is_public_label(line->label) || is_exported(line->label, exports, export_count)) {
-                labelsymbolmap_put(&labelSymbolMap, line->label, line->label);
-                symbolvec_push(&symbols, line->label, 1 /*defined*/, 0 /*text*/, pc);
-            } else {
-                char unique_name[96];
-                snprintf(unique_name, sizeof(unique_name), "%s-[%s:%u]", line->label, module_name, local_label_counter++);
-                labelsymbolmap_put(&labelSymbolMap, line->label, unique_name);
-                symbolvec_push(&symbols, unique_name, 1 /*defined*/, 0 /*text*/, pc);
-            }
-            pc += (line->num_instrucitons) * sizeof(uint32_t);
             uint32_t data_bytes = (uint32_t)line->data_count;
             uint32_t padded_data = (data_bytes + 3u) & ~3u;
             uint32_t payload = padded_data + (uint32_t)line->word_count * sizeof(uint32_t);
+            uint32_t section = 0;
+            uint32_t at = pc;
             if (line->section) {
-                // The block's payload is one chunk of a collected section.
                 if (line->num_instrucitons > 0) {
                     fprintf(stderr, "'.section %s' block '%s' must hold only data (.byte/.word), not instructions\n",
                             line->section, line->label);
                     exit(EXIT_FAILURE);
                 }
+                section = 2;
+                at = blob_pc;
                 collects = realloc(collects, sizeof(ObjCollect) * (collect_count + 1));
                 collects[collect_count].name = line->section;
-                collects[collect_count].offset = pc;
+                collects[collect_count].offset = blob_pc;
                 collects[collect_count].size = payload;
                 collect_count++;
             }
-            pc += payload; // data bytes (word-aligned for loader) and words
+            mapLabelToAddress(&labelMap, line->label, at);
+            if (is_public_label(line->label) || is_exported(line->label, exports, export_count)) {
+                labelsymbolmap_put(&labelSymbolMap, line->label, line->label);
+                symbolvec_push(&symbols, line->label, 1 /*defined*/, section, at);
+            } else {
+                char unique_name[96];
+                snprintf(unique_name, sizeof(unique_name), "%s-[%s:%u]", line->label, module_name, local_label_counter++);
+                labelsymbolmap_put(&labelSymbolMap, line->label, unique_name);
+                symbolvec_push(&symbols, unique_name, 1 /*defined*/, section, at);
+            }
+            if (line->section) {
+                blob_pc += payload;
+            } else {
+                pc += (line->num_instrucitons) * sizeof(uint32_t);
+                pc += payload; // data bytes (word-aligned for loader) and words
+            }
         }
     }
 
     uint32_t total_bytes = pc; // total output size in bytes
+    uint32_t blob_bytes = blob_pc;
 
     for (size_t i = 0; i < export_count; i++) {
         uint32_t addr;
@@ -365,11 +377,17 @@ MachineCode codeGen(AsmBlock *head, const char **imports, size_t import_count, c
         if (symbolvec_index(&symbols, imports[i]) >= 0) continue;
         symbolvec_push(&symbols, imports[i], 0 /*undefined*/, 0 /*section*/, 0 /*offset*/);
     }
-    uint8_t *machineCode = malloc(total_bytes);
+    uint8_t *machineCode = malloc(total_bytes ? total_bytes : 1);
     if (!machineCode) {
         perror("Failed to allocate machine code buffer");
         exit(EXIT_FAILURE);
     }
+    uint8_t *blob = malloc(blob_bytes ? blob_bytes : 1);
+    if (!blob) {
+        perror("Failed to allocate collected-section buffer");
+        exit(EXIT_FAILURE);
+    }
+    uint32_t blob_at = 0;
 
     // Second pass: encode instructions
     pc = 0;
@@ -389,7 +407,7 @@ MachineCode codeGen(AsmBlock *head, const char **imports, size_t import_count, c
                         }
                         // unresolved external: placeholder with opcode, record relative reloc
                         encoded = ENCODE(inst->instruction->label.opcode, 26);
-                        relocvec_push(&relocs, pc, label, 1 /*RELATIVE*/);
+                        relocvec_push(&relocs, pc, label, 1 /*RELATIVE*/, 0 /*TEXT*/);
                     }
                 } else if (inst->kind == INSTR_REGLABEL) {
                     char *label = inst->instruction->reglabel.label;
@@ -398,14 +416,14 @@ MachineCode codeGen(AsmBlock *head, const char **imports, size_t import_count, c
                     if (!symbol_name) symbol_name = label;
                     if (getLabelAddress(&labelMap, label, &addr)) {
                         encoded = encodeInstruction(&labelMap, inst, pc);
-                        relocvec_push(&relocs, pc, symbol_name, 0 /*ABSOLUTE*/);
+                        relocvec_push(&relocs, pc, symbol_name, 0 /*ABSOLUTE*/, 0 /*TEXT*/);
                     } else {
                         if (!is_imported(label, imports, import_count)) {
                             fprintf(stderr, "Undefined symbol '%s': not defined and not imported (add 'import %s')\n", label, label);
                             exit(EXIT_FAILURE);
                         }
                         encoded = encodeInstruction(&labelMap, inst, pc); // returns opcode/reg, imm=0
-                        relocvec_push(&relocs, pc, symbol_name, 0 /*ABSOLUTE*/);
+                        relocvec_push(&relocs, pc, symbol_name, 0 /*ABSOLUTE*/, 0 /*TEXT*/);
                     }
                 } else {
                     encoded = encodeInstruction(&labelMap, inst, pc);
@@ -421,6 +439,11 @@ MachineCode codeGen(AsmBlock *head, const char **imports, size_t import_count, c
             machineCode[pc++] = (uint8_t)(encoded & 0xFF);
         }
 
+        // The payload's destination: TEXT, or the blob for a `.section` block.
+        uint8_t *dest = line->section ? blob : machineCode;
+        uint32_t *cursor = line->section ? &blob_at : &pc;
+        uint32_t dest_section = line->section ? 2 : 0;
+
         // Append raw data bytes if present
         if (line->data_count > 0) {
             size_t data_bytes = line->data_count;
@@ -433,10 +456,10 @@ MachineCode codeGen(AsmBlock *head, const char **imports, size_t import_count, c
                         block[j] = encodeByte(line->data[idx]);
                     }
                 }
-                machineCode[pc++] = block[0];
-                machineCode[pc++] = block[1];
-                machineCode[pc++] = block[2];
-                machineCode[pc++] = block[3];
+                dest[(*cursor)++] = block[0];
+                dest[(*cursor)++] = block[1];
+                dest[(*cursor)++] = block[2];
+                dest[(*cursor)++] = block[3];
             }
         }
 
@@ -455,13 +478,13 @@ MachineCode codeGen(AsmBlock *head, const char **imports, size_t import_count, c
                     fprintf(stderr, "Undefined symbol '%s' in .word: not defined and not imported (add 'import %s')\n", w->symbol, w->symbol);
                     exit(EXIT_FAILURE);
                 }
-                relocvec_push(&relocs, pc, symbol_name, 2 /*WORD32*/);
+                relocvec_push(&relocs, *cursor, symbol_name, 2 /*WORD32*/, dest_section);
                 value = 0;
             }
-            machineCode[pc++] = (uint8_t)((value >> 24) & 0xFF);
-            machineCode[pc++] = (uint8_t)((value >> 16) & 0xFF);
-            machineCode[pc++] = (uint8_t)((value >> 8) & 0xFF);
-            machineCode[pc++] = (uint8_t)(value & 0xFF);
+            dest[(*cursor)++] = (uint8_t)((value >> 24) & 0xFF);
+            dest[(*cursor)++] = (uint8_t)((value >> 16) & 0xFF);
+            dest[(*cursor)++] = (uint8_t)((value >> 8) & 0xFF);
+            dest[(*cursor)++] = (uint8_t)(value & 0xFF);
         }
     }
 
@@ -474,5 +497,7 @@ MachineCode codeGen(AsmBlock *head, const char **imports, size_t import_count, c
     result.reloc_count = relocs.count;
     result.collects = collects;
     result.collect_count = collect_count;
+    result.blob = blob;
+    result.blob_size = blob_bytes;
     return result;
 }

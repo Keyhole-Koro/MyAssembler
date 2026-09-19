@@ -16,14 +16,15 @@ typedef struct {
 } ObjSymbol;
 
 typedef struct {
-    uint32_t offset;      // offset in text section to patch
+    uint32_t offset;      // offset to patch within `section`
     char *symbol_name;    // target symbol
-    uint32_t type;        // 0=ABSOLUTE, 1=RELATIVE
+    uint32_t type;        // 0=ABSOLUTE, 1=RELATIVE, 2=WORD32
+    uint32_t section;     // 0=TEXT, 2=COLLECT blob
 } ObjReloc;
 
 typedef struct {
     char *name;           // section name
-    uint32_t offset;      // chunk offset in text
+    uint32_t offset;      // chunk offset in the collected-section blob
     uint32_t size;        // chunk size in bytes
 } ObjCollect;
 
@@ -37,9 +38,12 @@ typedef struct {
     ObjReloc *relocs;
     size_t reloc_count;
 
-    // Chunks of named collected sections (see ObjectFormat.h CollectEntry).
+    // Chunks of named collected sections (see ObjectFormat.h CollectEntry),
+    // whose bytes are in `blob`.
     ObjCollect *collects;
     size_t collect_count;
+    uint8_t *blob;
+    size_t blob_size;
 } MachineCode;
 
 // Encode a single data byte (mask to 8 bits)

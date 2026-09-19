@@ -33,10 +33,11 @@ label:
 
 .section annotations              ; the next label block is one chunk of the
 rows:                             ; named collected section: data only, no
-  .word s_0, Counter__view, 12    ; instructions. The linker gathers all
-                                  ; chunks of a name into an index between
-                                  ; __annotations_start and __annotations_end.
+  .word s_0, Counter__view, 12    ; instructions. The linker lays all chunks
+                                  ; of a name out contiguously and defines
+                                  ; __section_annotations (+ _size); the
+                                  ; directory __sections lists every section.
 ```
 
-Object files are LNK2 (`--obj`): see `toolchain/MyLinker/inc/ObjectFormat.h`
+Object files are LNK3 (`--obj`): see `toolchain/MyLinker/inc/ObjectFormat.h`
 and `docs/design/toolchain-collected-sections.md`.
