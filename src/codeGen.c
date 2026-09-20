@@ -319,6 +319,7 @@ MachineCode codeGen(AsmBlock *head, const char **imports, size_t import_count, c
     // linker relocates chunk by chunk; everything else is TEXT.
     uint32_t pc = 0;
     uint32_t blob_pc = 0;
+    uint32_t data_pc = 0;
     uint32_t local_label_counter = 1;
     for (AsmBlock *line = head; line; line = line->next) {
 
@@ -341,6 +342,14 @@ MachineCode codeGen(AsmBlock *head, const char **imports, size_t import_count, c
                 collects[collect_count].offset = blob_pc;
                 collects[collect_count].size = payload;
                 collect_count++;
+            } else if (line->in_data) {
+                if (line->num_instrucitons > 0) {
+                    fprintf(stderr, "'.data' block '%s' must hold only data (.byte/.word), not instructions\n",
+                            line->label);
+                    exit(EXIT_FAILURE);
+                }
+                section = 1;
+                at = data_pc;
             }
             mapLabelToAddress(&labelMap, line->label, at);
             if (is_public_label(line->label) || is_exported(line->label, exports, export_count)) {
@@ -354,6 +363,8 @@ MachineCode codeGen(AsmBlock *head, const char **imports, size_t import_count, c
             }
             if (line->section) {
                 blob_pc += payload;
+            } else if (line->in_data) {
+                data_pc += payload;
             } else {
                 pc += (line->num_instrucitons) * sizeof(uint32_t);
                 pc += payload; // data bytes (word-aligned for loader) and words
@@ -363,6 +374,7 @@ MachineCode codeGen(AsmBlock *head, const char **imports, size_t import_count, c
 
     uint32_t total_bytes = pc; // total output size in bytes
     uint32_t blob_bytes = blob_pc;
+    uint32_t data_bytes_total = data_pc;
 
     for (size_t i = 0; i < export_count; i++) {
         uint32_t addr;
@@ -388,6 +400,12 @@ MachineCode codeGen(AsmBlock *head, const char **imports, size_t import_count, c
         exit(EXIT_FAILURE);
     }
     uint32_t blob_at = 0;
+    uint8_t *data_out = malloc(data_bytes_total ? data_bytes_total : 1);
+    if (!data_out) {
+        perror("Failed to allocate data section buffer");
+        exit(EXIT_FAILURE);
+    }
+    uint32_t data_at = 0;
 
     // Second pass: encode instructions
     pc = 0;
@@ -439,10 +457,11 @@ MachineCode codeGen(AsmBlock *head, const char **imports, size_t import_count, c
             machineCode[pc++] = (uint8_t)(encoded & 0xFF);
         }
 
-        // The payload's destination: TEXT, or the blob for a `.section` block.
-        uint8_t *dest = line->section ? blob : machineCode;
-        uint32_t *cursor = line->section ? &blob_at : &pc;
-        uint32_t dest_section = line->section ? 2 : 0;
+        // The payload's destination: TEXT, DATA for a `.data` block, or the
+        // blob for a `.section` block.
+        uint8_t *dest = line->section ? blob : (line->in_data ? data_out : machineCode);
+        uint32_t *cursor = line->section ? &blob_at : (line->in_data ? &data_at : &pc);
+        uint32_t dest_section = line->section ? 2 : (line->in_data ? 1 : 0);
 
         // Append raw data bytes if present
         if (line->data_count > 0) {
@@ -491,6 +510,8 @@ MachineCode codeGen(AsmBlock *head, const char **imports, size_t import_count, c
     MachineCode result = {0};
     result.code = machineCode;
     result.size = total_bytes;
+    result.data = data_out;
+    result.data_size = data_bytes_total;
     result.symbols = symbols.items;
     result.symbol_count = symbols.count;
     result.relocs = relocs.items;

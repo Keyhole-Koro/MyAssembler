@@ -39,5 +39,15 @@ rows:                             ; named collected section: data only, no
                                   ; directory __sections lists every section.
 ```
 
+```asm
+.data                             ; every label block from here to `.text` is
+counter:                          ; in the DATA section: writable storage the
+  .word 0                         ; loader maps apart from code (globals,
+message:                          ; strings, constant pools -- what mlc emits
+  .byte 0x68, 0x69, 0x00          ; after its functions). Data only, no
+.text                             ; instructions; symbols get section=1 and a
+                                  ; `.word sym` inside is a DATA relocation.
+```
+
 Object files are LNK3 (`--obj`): see `toolchain/MyLinker/inc/ObjectFormat.h`
 and `docs/design/toolchain-collected-sections.md`.

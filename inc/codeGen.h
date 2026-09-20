@@ -19,7 +19,7 @@ typedef struct {
     uint32_t offset;      // offset to patch within `section`
     char *symbol_name;    // target symbol
     uint32_t type;        // 0=ABSOLUTE, 1=RELATIVE, 2=WORD32
-    uint32_t section;     // 0=TEXT, 2=COLLECT blob
+    uint32_t section;     // 0=TEXT, 1=DATA, 2=COLLECT blob
 } ObjReloc;
 
 typedef struct {
@@ -31,6 +31,9 @@ typedef struct {
 typedef struct {
     uint8_t *code; // raw bytes (text section)
     size_t size;   // number of bytes
+
+    uint8_t *data;     // raw bytes (data section: `.data` blocks)
+    size_t data_size;
 
     ObjSymbol *symbols;
     size_t symbol_count;

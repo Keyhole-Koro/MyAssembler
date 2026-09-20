@@ -448,6 +448,7 @@ AsmBlock *label(Token **cur) {
     label_inst_line->words = NULL;
     label_inst_line->word_count = 0;
     label_inst_line->section = NULL;
+    label_inst_line->in_data = 0;
     label_inst_line->next = NULL; // Initialize the next pointer to NULL
     
     AsmInstr *cur_inst = label_inst_line->inst_list;
@@ -471,8 +472,10 @@ AsmBlock *label(Token **cur) {
                 continue;
             }
             if ((*cur)->type == PERIOD) {
-                // `.section` starts a new block: leave it to the top level.
-                if ((*cur)->next && (*cur)->next->type == LABEL && strcmp((*cur)->next->str, "section") == 0) break;
+                // `.section` / `.data` / `.text` end the block: leave them to the top level.
+                if ((*cur)->next && (*cur)->next->type == LABEL &&
+                    (strcmp((*cur)->next->str, "section") == 0 || strcmp((*cur)->next->str, "data") == 0 ||
+                     strcmp((*cur)->next->str, "text") == 0)) break;
                 consume(cur);
                 parse_byte_directive(cur, label_inst_line);
                 continue;
@@ -496,6 +499,7 @@ AsmBlock *parser(Token *head) {
 
     AsmBlock *new_label = NULL;
     char *pending_section = NULL; // from `.section name`, applied to the next block
+    int in_data = 0;              // `.data` ... `.text`: the blocks between go to DATA
     Token **cur = &head;
     while (*cur) {
         while (*cur && (*cur)->type == NEWLINE) consume(cur);
@@ -523,9 +527,20 @@ AsmBlock *parser(Token *head) {
             continue;
         }
 
+        // `.data` / `.text`: every label block from here on goes to the DATA
+        // section (writable storage: a program's globals) / back to TEXT.
+        if ((*cur)->type == PERIOD && (*cur)->next && (*cur)->next->type == LABEL &&
+            (strcmp((*cur)->next->str, "data") == 0 || strcmp((*cur)->next->str, "text") == 0)) {
+            in_data = strcmp((*cur)->next->str, "data") == 0;
+            consume(cur);
+            consume(cur);
+            continue;
+        }
+
         if (is_label_declaration(*cur)) {
             new_label = label(cur);
             new_label->section = pending_section;
+            new_label->in_data = pending_section ? 0 : in_data;
             pending_section = NULL;
         /*
         } else if ((*cur)->type == INSTRUCTION) {

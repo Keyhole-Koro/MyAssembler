@@ -127,6 +127,9 @@ struct AsmBlock {
     // Named collected section this block's payload belongs to (from a
     // preceding `.section name`), or NULL for ordinary text/data.
     char *section;
+    // 1: the block is in the DATA section (`.data` ... `.text`): writable
+    // storage the loader maps separately from code. Data only.
+    int in_data;
     AsmBlock *next; // Pointer to the next labeled block
 };
 

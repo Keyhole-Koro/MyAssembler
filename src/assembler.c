@@ -36,7 +36,7 @@ MachineCode assembler(const char *file_path, const char *output_path) {
     Token *tokens = _lexer(file_path);
     if (!tokens) {
         fprintf(stderr, "No tokens found.\n");
-        return (MachineCode){NULL, 0, NULL, 0, NULL, 0, NULL, 0, NULL, 0};
+        return (MachineCode){0};
     }
 
     AsmBlock *parsed = parser(tokens);
@@ -96,7 +96,7 @@ void write_object(const char *obj_path, const MachineCode *mc) {
     struct FileHeader hdr = {0};
     hdr.magic = LINKER_MAGIC;
     hdr.text_size = (uint32_t)mc->size;
-    hdr.data_size = 0;
+    hdr.data_size = (uint32_t)mc->data_size;
     hdr.symtable_count = (uint32_t)mc->symbol_count;
     hdr.reloc_count = (uint32_t)mc->reloc_count;
     hdr.collect_count = (uint32_t)mc->collect_count;
@@ -106,7 +106,8 @@ void write_object(const char *obj_path, const MachineCode *mc) {
     // text section
     fwrite(mc->code, 1, mc->size, f);
 
-    // no data section (yet)
+    // data section
+    if (mc->data_size > 0) fwrite(mc->data, 1, mc->data_size, f);
 
     // collected-section blob
     if (mc->blob_size > 0) fwrite(mc->blob, 1, mc->blob_size, f);
