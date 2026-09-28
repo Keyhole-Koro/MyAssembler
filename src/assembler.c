@@ -1,5 +1,6 @@
 #include "assembler.h"
 
+#include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -83,6 +84,123 @@ MachineCode assembler(const char *file_path, const char *output_path) {
     size_t export_count = 0;
     const char **exports = parser_get_exports(&export_count);
     return codeGen(parsed, imports, import_count, exports, export_count, file_path);
+}
+
+typedef struct SourceDependency {
+    char *canonical_path;
+    const char *kind;
+} SourceDependency;
+
+static int path_has_suffix(const char *path, const char *suffix) {
+    size_t path_len = strlen(path);
+    size_t suffix_len = strlen(suffix);
+    return path_len >= suffix_len &&
+           strcmp(path + path_len - suffix_len, suffix) == 0;
+}
+
+static void free_dependencies(SourceDependency *dependencies, size_t count) {
+    for (size_t i = 0; i < count; i++) free(dependencies[i].canonical_path);
+    free(dependencies);
+}
+
+int write_dependency_file(const char *depfile_path, const char *file_path) {
+    if (!depfile_path || !file_path) return 0;
+
+    char source_path[PATH_MAX];
+    if (!realpath(file_path, source_path)) {
+        fprintf(stderr, "Failed to resolve assembler source path: %s\n", file_path);
+        return 0;
+    }
+    char *slash = strrchr(source_path, '/');
+    if (!slash) {
+        fprintf(stderr, "Assembler source path has no directory: %s\n", source_path);
+        return 0;
+    }
+    *slash = '\0';
+
+    size_t import_path_count = 0;
+    const char **import_paths = parser_get_import_paths(&import_path_count);
+    SourceDependency *dependencies = NULL;
+    size_t dependency_count = 0;
+    for (size_t i = 0; i < import_path_count; i++) {
+        char unresolved[PATH_MAX];
+        int written;
+        if (import_paths[i][0] == '/') {
+            written = snprintf(unresolved, sizeof(unresolved), "%s", import_paths[i]);
+        } else {
+            written = snprintf(unresolved, sizeof(unresolved), "%s/%s",
+                               source_path, import_paths[i]);
+        }
+        if (written < 0 || (size_t)written >= sizeof(unresolved)) {
+            fprintf(stderr, "Assembler dependency path is too long: %s\n", import_paths[i]);
+            free_dependencies(dependencies, dependency_count);
+            return 0;
+        }
+
+        char canonical[PATH_MAX];
+        if (!realpath(unresolved, canonical)) {
+            fprintf(stderr, "Failed to resolve assembler dependency '%s' from '%s'\n",
+                    import_paths[i], file_path);
+            free_dependencies(dependencies, dependency_count);
+            return 0;
+        }
+        const char *kind = NULL;
+        if (path_has_suffix(canonical, ".mln")) kind = "mln";
+        else if (path_has_suffix(canonical, ".masm")) kind = "masm";
+        else {
+            fprintf(stderr, "Unsupported assembler dependency type: %s\n", canonical);
+            free_dependencies(dependencies, dependency_count);
+            return 0;
+        }
+        if (strchr(canonical, '\n') || strchr(canonical, '\r') || strchr(canonical, '\t')) {
+            fprintf(stderr, "Assembler dependency path contains control characters: %s\n",
+                    canonical);
+            free_dependencies(dependencies, dependency_count);
+            return 0;
+        }
+
+        int duplicate = 0;
+        for (size_t j = 0; j < dependency_count; j++) {
+            if (strcmp(dependencies[j].canonical_path, canonical) == 0) {
+                duplicate = 1;
+                break;
+            }
+        }
+        if (duplicate) continue;
+
+        SourceDependency *grown = realloc(
+            dependencies, sizeof(SourceDependency) * (dependency_count + 1));
+        if (!grown) {
+            fprintf(stderr, "Out of memory while collecting assembler dependencies\n");
+            free_dependencies(dependencies, dependency_count);
+            return 0;
+        }
+        dependencies = grown;
+        dependencies[dependency_count].canonical_path = strdup(canonical);
+        dependencies[dependency_count].kind = kind;
+        if (!dependencies[dependency_count].canonical_path) {
+            fprintf(stderr, "Out of memory while collecting assembler dependencies\n");
+            free_dependencies(dependencies, dependency_count);
+            return 0;
+        }
+        dependency_count++;
+    }
+
+    FILE *file = fopen(depfile_path, "wb");
+    if (!file) {
+        fprintf(stderr, "Failed to open dependency file: %s\n", depfile_path);
+        free_dependencies(dependencies, dependency_count);
+        return 0;
+    }
+    fprintf(file, "MYDEPS 1\n");
+    for (size_t i = 0; i < dependency_count; i++) {
+        fprintf(file, "%s\t%s\n", dependencies[i].kind,
+                dependencies[i].canonical_path);
+    }
+    int ok = fclose(file) == 0;
+    if (!ok) fprintf(stderr, "Failed to write dependency file: %s\n", depfile_path);
+    free_dependencies(dependencies, dependency_count);
+    return ok;
 }
 
 void write_object(const char *obj_path, const MachineCode *mc) {

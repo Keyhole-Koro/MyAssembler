@@ -11,9 +11,15 @@ MyAssembler is a 32-bit assembler designed to convert assembly language code int
 ## Usage
 To use the assembler, run the executable with the assembly file as an argument:
 ```
-./myassembler <assembly_file.asm>
+./build/myas <input.masm> <output.mbin> [--obj <output.mobj>] [--depfile <path>]
 ```
 This will process the assembly file and generate the corresponding machine code.
+
+`--depfile` writes a `MYDEPS 1` manifest containing the canonical direct source
+dependencies named by `import ... from "..."`. Dependency paths are resolved
+relative to the input assembly file. The assembler records undefined symbols
+in the object file; the linker still receives an explicit list of objects and
+does not search for source files.
 
 ## Architecture Specification
 The assembler adheres to the architecture defined in `include/architecture_spec.h`. This file contains the necessary constants, structures, and function prototypes to ensure compliance with the architecture.

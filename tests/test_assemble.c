@@ -121,8 +121,36 @@ void test_all_samples(void) {
     TEST_PASS();
 }
 
+void test_dependency_file_uses_import_from_path(void) {
+    ensure_output_dir();
+    const char *source = "tests/succeed/function/importFrom_main.masm";
+    const char *binary = "tests/outputs/importFrom_main_dep_test.bin";
+    const char *depfile = "tests/outputs/importFrom_main_dep_test.deps";
+
+    MachineCode mc = assembler(source, binary);
+    TEST_ASSERT_TRUE(write_dependency_file(depfile, source));
+
+    char helper[PATH_MAX];
+    TEST_ASSERT_NOT_NULL(realpath(
+        "tests/succeed/function/importFrom_helper.masm", helper));
+
+    FILE *file = fopen(depfile, "rb");
+    TEST_ASSERT_NOT_NULL(file);
+    char contents[PATH_MAX + 64];
+    size_t count = fread(contents, 1, sizeof(contents) - 1, file);
+    contents[count] = '\0';
+    fclose(file);
+
+    TEST_ASSERT_TRUE(strncmp(contents, "MYDEPS 1\n", 9) == 0);
+    TEST_ASSERT_NOT_NULL(strstr(contents, "masm\t"));
+    TEST_ASSERT_NOT_NULL(strstr(contents, helper));
+
+    free(mc.code);
+}
+
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_all_samples);
+    RUN_TEST(test_dependency_file_uses_import_from_path);
     return UNITY_END();
 }

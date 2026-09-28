@@ -68,20 +68,30 @@ static void write_hex_dump(const char *bin_path, const char *custom_path, const 
 
 int main(int argc, char *argv[]) {
     if (argc < 3) {
-        fprintf(stderr, "Usage: %s <input.asm> <output.bin> [hexdump.txt] [--obj <output.obj>]\n", argv[0]);
+        fprintf(stderr, "Usage: %s <input.asm> <output.bin> [hexdump.txt] [--obj <output.obj>] [--depfile <path>]\n", argv[0]);
         return 1;
     }
     const char *input_path = argv[1];
     const char *output_path = argv[2];
     const char *hexdump_path = NULL;
     const char *obj_path = NULL;
+    const char *depfile_path = NULL;
 
     for (int i = 3; i < argc; ++i) {
         if (strcmp(argv[i], "--obj") == 0 && i + 1 < argc) {
             obj_path = argv[i + 1];
             ++i;
+        } else if (strcmp(argv[i], "--depfile") == 0 && i + 1 < argc) {
+            depfile_path = argv[i + 1];
+            ++i;
+        } else if (strcmp(argv[i], "--obj") == 0 || strcmp(argv[i], "--depfile") == 0) {
+            fprintf(stderr, "%s requires a path\n", argv[i]);
+            return 1;
         } else if (!hexdump_path) {
             hexdump_path = argv[i];
+        } else {
+            fprintf(stderr, "Unexpected argument: %s\n", argv[i]);
+            return 1;
         }
     }
 
@@ -106,11 +116,13 @@ int main(int argc, char *argv[]) {
         write_object(obj_path, &mc);
     }
 
+    int depfile_ok = !depfile_path || write_dependency_file(depfile_path, input_path);
+
     free(mc.code);
     for (size_t i = 0; i < mc.symbol_count; ++i) free(mc.symbols[i].name);
     free(mc.symbols);
     for (size_t i = 0; i < mc.reloc_count; ++i) free(mc.relocs[i].symbol_name);
     free(mc.relocs);
 
-    return 0;
+    return depfile_ok ? 0 : 1;
 }

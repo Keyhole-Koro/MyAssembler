@@ -9,6 +9,8 @@ void parser_set_source_file(const char *path) { g_src_file = path; }
 
 static char **g_imports = NULL;
 static size_t g_import_count = 0;
+static char **g_import_paths = NULL;
+static size_t g_import_path_count = 0;
 static char **g_exports = NULL;
 static size_t g_export_count = 0;
 
@@ -19,6 +21,12 @@ static void reset_symbols(void) {
     }
     g_imports = NULL;
     g_import_count = 0;
+    if (g_import_paths) {
+        for (size_t i = 0; i < g_import_path_count; i++) free(g_import_paths[i]);
+        free(g_import_paths);
+    }
+    g_import_paths = NULL;
+    g_import_path_count = 0;
     if (g_exports) {
         for (size_t i = 0; i < g_export_count; i++) free(g_exports[i]);
         free(g_exports);
@@ -44,6 +52,10 @@ static void add_import(const char *name) {
     add_symbol_name(&g_imports, &g_import_count, name, "import");
 }
 
+static void add_import_path(const char *path) {
+    add_symbol_name(&g_import_paths, &g_import_path_count, path, "import path");
+}
+
 static void add_export(const char *name) {
     add_symbol_name(&g_exports, &g_export_count, name, "export");
 }
@@ -51,6 +63,11 @@ static void add_export(const char *name) {
 const char **parser_get_imports(size_t *count) {
     if (count) *count = g_import_count;
     return (const char **)g_imports;
+}
+
+const char **parser_get_import_paths(size_t *count) {
+    if (count) *count = g_import_path_count;
+    return (const char **)g_import_paths;
 }
 
 const char **parser_get_exports(size_t *count) {
@@ -213,6 +230,7 @@ static void parse_import(Token **cur) {
         if (!*cur || (*cur)->type != STRING_LITERAL) {
             ERROR(*cur, "Expected file path string after from");
         }
+        add_import_path((*cur)->str);
         consume(cur);
     }
     if (*cur && (*cur)->type == NEWLINE) { consume(cur); }
