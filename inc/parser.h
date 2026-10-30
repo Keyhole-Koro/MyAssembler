@@ -36,6 +36,14 @@ typedef struct {
     uint8_t reg2;     // 5 bits
 } InstrRegReg;
 
+// Pattern: reg, reg, reg (CAS expected/result, replacement, address)
+typedef struct {
+    uint8_t opcode;
+    uint8_t reg1;
+    uint8_t reg2;
+    uint8_t reg3;
+} InstrRegRegReg;
+
 // Pattern: reg, imm21 (e.g. MOVI R1, imm)
 typedef struct {
     uint8_t opcode;   // 6 bits
@@ -74,6 +82,7 @@ typedef struct {
 
 typedef enum {
     INSTR_REGREG,
+    INSTR_REGREGREG,
     INSTR_REGIMM21,
     INSTR_REG,
     INSTR_LABEL,
@@ -86,6 +95,7 @@ typedef enum {
 typedef union {
     InstructionBase base;
     InstrRegReg regreg;
+    InstrRegRegReg regregreg;
     InstrRegImm21 regimm21;
     InstrReg reg;
     InstrLabel label;

@@ -185,6 +185,17 @@ uint32_t encodeRegReg(InstrRegReg instr) {
     return ENCODE(instr.opcode, 26) | ENCODE(instr.reg1, 21) | ENCODE(instr.reg2, 16);
 }
 
+/**
+ * Encodes an opcode and three five-bit register operands.
+ * @param instr Parsed three-register instruction.
+ * @return 32-bit machine instruction with operands at bits 25:11.
+ */
+uint32_t encodeRegRegReg(InstrRegRegReg instr) {
+    assert(instr.reg1 < 32 && instr.reg2 < 32 && instr.reg3 < 32);
+    return ENCODE(instr.opcode, 26) | ENCODE(instr.reg1, 21) |
+           ENCODE(instr.reg2, 16) | ENCODE(instr.reg3, 11);
+}
+
 uint32_t encodeRegImm21(InstrRegImm21 instr) {
     // An out-of-range immediate is a real input error, not an internal
     // inconsistency: it means the caller emitted something like
@@ -253,6 +264,8 @@ uint32_t encodeInstruction(LabelMap *map, AsmInstr *inst_list, uint32_t currentP
     switch (inst_list->kind) {
         case INSTR_REGREG:
             return encodeRegReg(inst->regreg);
+        case INSTR_REGREGREG:
+            return encodeRegRegReg(inst->regregreg);
         case INSTR_REGIMM21:
             return encodeRegImm21(inst->regimm21);
         case INSTR_REG:

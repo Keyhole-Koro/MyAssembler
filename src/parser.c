@@ -334,6 +334,28 @@ AsmInstr *instrRegReg(Token *opcode, Token *reg1, Token *reg2) {
     return (AsmInstr *)instrList;
 }
 
+/**
+ * Builds the three-register instruction node used by CAS.
+ * @param opcode Opcode token naming the instruction.
+ * @param reg1 Expected-value and result register token.
+ * @param reg2 Replacement-value register token.
+ * @param reg3 Address register token.
+ * @return Newly allocated parser instruction node.
+ */
+AsmInstr *instrRegRegReg(Token *opcode, Token *reg1, Token *reg2, Token *reg3) {
+    AsmInstr *instrList = malloc(sizeof(AsmInstr));
+    InstrRegRegReg *value = malloc(sizeof(InstrRegRegReg));
+    instrList->kind = INSTR_REGREGREG;
+    value->opcode = mapOpcode(opcode->str);
+    value->reg1 = mapRegister(reg1->str);
+    value->reg2 = mapRegister(reg2->str);
+    value->reg3 = mapRegister(reg3->str);
+    instrList->instruction = (Instruction *)value;
+    instrList->needs_fixup = false;
+    instrList->next = NULL;
+    return instrList;
+}
+
 AsmInstr *instrRegImm21(Token *opcode, Token *reg1, Token *imm21) {
     AsmInstr *instrList = malloc(sizeof(AsmInstr));
     InstrRegImm21 *regImm21 = malloc(sizeof(InstrRegImm21));
@@ -362,6 +384,18 @@ AsmInstr *instrRegAppears(Token **cur, Token *opcode, Token *reg1) {
         if ((*cur)->type == REGISTER) {
             Token *reg2 = *cur; // Save the second register
             consume(cur);
+            if (strcmp(opcode->str, "cas") == 0 || strcmp(opcode->str, "CAS") == 0) {
+                if (!*cur || (*cur)->type != COMMA) {
+                    ERROR(*cur, "Expected COMMA and third register for CAS");
+                }
+                consume(cur);
+                if (!*cur || (*cur)->type != REGISTER) {
+                    ERROR(*cur, "Expected third REGISTER for CAS");
+                }
+                Token *reg3 = *cur;
+                consume(cur);
+                return instrRegRegReg(opcode, reg1, reg2, reg3);
+            }
             return instrRegReg(opcode, reg1, reg2);
 
         } else if ((*cur)->type == NUMBER || (*cur)->type == NEGATIVE_NUMBER) {

@@ -1,0 +1,4 @@
+atomic_start:
+  swp r1, r2
+  cas r3, r4, r5
+  halt
