@@ -18,6 +18,7 @@ const InstructionDef instruction_table[] = {
     {"storeb",0x1D},
     {"swp",   0x22},
     {"cas",   0x23},
+    {"chk",   0x24},
 
     // arith/logic
     {"add",   0x05},

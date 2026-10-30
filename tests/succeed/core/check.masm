@@ -1,0 +1,4 @@
+check_start:
+  movi r1, 3
+  chk r1, 4
+  halt
