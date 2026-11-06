@@ -596,6 +596,7 @@ AsmBlock *parser(Token *head) {
     Token **cur = &head;
     while (*cur) {
         while (*cur && (*cur)->type == NEWLINE) consume(cur);
+        if (!*cur) break; // a file that ends in blank lines or a comment
         if ((*cur)->type == 0) { consume(cur); continue; } // Skip
 
         if ((*cur)->type == IMPORT) {

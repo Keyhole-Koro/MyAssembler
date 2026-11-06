@@ -16,6 +16,7 @@ EMU_PATH = PROJECT_ROOT / "runtime" / "MyEmulator" / "target" / "release" / "mye
 
 TESTCASES = [
     ("simpleChar", ["succeed/memory/simpleChar.masm"], "R1", 72),
+    ("trailingComment", ["succeed/core/trailingComment_main.masm", "succeed/core/trailingComment_empty.masm"], "R1", 7),
     ("importFrom", ["succeed/function/importFrom_main.masm", "succeed/function/importFrom_helper.masm"], "R1", 11),
     ("exportFrom", ["succeed/function/exportFrom_main.masm", "succeed/function/exportFrom_helper.masm"], "R1", 11),
     ("localDataReloc", ["succeed/memory/localDataReloc_main.masm", "succeed/memory/localDataReloc_helper.masm"], "R1", 77),

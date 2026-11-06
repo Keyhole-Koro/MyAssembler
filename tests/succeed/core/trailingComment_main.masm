@@ -1,0 +1,3 @@
+__START__:
+  movi r1, 7
+  halt
