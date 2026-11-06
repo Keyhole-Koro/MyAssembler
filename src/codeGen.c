@@ -314,6 +314,54 @@ static void build_module_tag(const char *module_tag, char *out, size_t out_size)
     if (len == 0) snprintf(out, out_size, "obj");
 }
 
+// Offset of `text` in the pool, adding it if new.
+static uint32_t debug_string(ObjDebug *debug, const char *text) {
+    size_t at = 0;
+    while (at < debug->string_size) {
+        if (strcmp(debug->strings + at, text) == 0) return (uint32_t)at;
+        at += strlen(debug->strings + at) + 1;
+    }
+    size_t length = strlen(text) + 1;
+    debug->strings = realloc(debug->strings, debug->string_size + length);
+    memcpy(debug->strings + debug->string_size, text, length);
+    debug->string_size += length;
+    return (uint32_t)at;
+}
+
+// Turn one text block's marks into trailer rows. `file`, `line` and `cost`
+// carry across blocks: a statement's code can span several labels.
+static void collect_debug(ObjDebug *debug, const AsmBlock *block, uint32_t block_pc,
+                          uint32_t *file, uint32_t *line, uint32_t *cost) {
+    for (size_t i = 0; i < block->mark_count; ++i) {
+        const AsmMark *mark = &block->marks[i];
+        uint32_t offset = block_pc + (uint32_t)mark->at * sizeof(uint32_t);
+        if (mark->kind == ASM_MARK_FUNC) {
+            *file = debug_string(debug, mark->file);
+            *line = 0;
+            *cost = 0;
+            debug->funcs = realloc(debug->funcs, sizeof(ObjDebugFunc) * (debug->func_count + 1));
+            debug->funcs[debug->func_count].offset = offset;
+            debug->funcs[debug->func_count].name = debug_string(debug, mark->name);
+            debug->funcs[debug->func_count].file = *file;
+            debug->func_count++;
+        } else if (mark->kind == ASM_MARK_LOC) {
+            *line = mark->line;
+        } else {
+            *cost = debug_string(debug, mark->name);
+        }
+        // Directives at one address: the last says what the code there is.
+        if (debug->row_count > 0 && debug->rows[debug->row_count - 1].offset == offset) {
+            debug->row_count--;
+        }
+        debug->rows = realloc(debug->rows, sizeof(ObjDebugRow) * (debug->row_count + 1));
+        debug->rows[debug->row_count].offset = offset;
+        debug->rows[debug->row_count].file = *file;
+        debug->rows[debug->row_count].line = *line;
+        debug->rows[debug->row_count].cost = *cost;
+        debug->row_count++;
+    }
+}
+
 MachineCode codeGen(AsmBlock *head, const char **imports, size_t import_count, const char **exports, size_t export_count, const char *module_tag) {
     LabelMap labelMap;
     LabelSymbolMap labelSymbolMap;
@@ -334,6 +382,9 @@ MachineCode codeGen(AsmBlock *head, const char **imports, size_t import_count, c
     uint32_t blob_pc = 0;
     uint32_t data_pc = 0;
     uint32_t local_label_counter = 1;
+    ObjDebug debug = {0};
+    uint32_t debug_file = 0, debug_line = 0, debug_cost = 0;
+    debug_string(&debug, "");
     for (AsmBlock *line = head; line; line = line->next) {
 
         if (line->label && strlen(line->label) > 0) {
@@ -379,6 +430,7 @@ MachineCode codeGen(AsmBlock *head, const char **imports, size_t import_count, c
             } else if (line->in_data) {
                 data_pc += payload;
             } else {
+                collect_debug(&debug, line, pc, &debug_file, &debug_line, &debug_cost);
                 pc += (line->num_instrucitons) * sizeof(uint32_t);
                 pc += payload; // data bytes (word-aligned for loader) and words
             }
@@ -533,5 +585,6 @@ MachineCode codeGen(AsmBlock *head, const char **imports, size_t import_count, c
     result.collect_count = collect_count;
     result.blob = blob;
     result.blob_size = blob_bytes;
+    result.debug = debug;
     return result;
 }

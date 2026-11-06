@@ -7,7 +7,7 @@
 #include <stdbool.h>
 #include "instructions.h"
 
-#define MAX_TOKEN_LEN 128
+#define MAX_TOKEN_LEN 512
 
 bool is_number(char c) {
     return c >= '0' && c <= '9';

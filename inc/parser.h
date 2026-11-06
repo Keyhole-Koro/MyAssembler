@@ -125,6 +125,21 @@ typedef struct {
     char *symbol;   // NULL for a plain number
 } AsmWord;
 
+// A debug directive, which sits before instruction `at` of its block.
+typedef enum {
+    ASM_MARK_FUNC, // `.func "name" "file"`
+    ASM_MARK_LOC,  // `.loc line`
+    ASM_MARK_COST  // `.cost "kind"`, or "" to leave the region
+} AsmMarkKind;
+
+typedef struct {
+    AsmMarkKind kind;
+    int at;
+    char *name;   // FUNC: function name. COST: kind.
+    char *file;   // FUNC
+    uint32_t line; // LOC
+} AsmMark;
+
 struct AsmBlock {
     char *label; // Empty string if no label
     int num_instrucitons; // Number of instructions
@@ -141,6 +156,8 @@ struct AsmBlock {
     // 1: the block is in the DATA section (`.data` ... `.text`): writable
     // storage the loader maps separately from code. Data only.
     int in_data;
+    AsmMark *marks;
+    size_t mark_count;
     AsmBlock *next; // Pointer to the next labeled block
 };
 

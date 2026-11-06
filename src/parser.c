@@ -164,6 +164,46 @@ static void parse_word_directive(Token **cur, AsmBlock *line) {
     if (*cur && (*cur)->type == NEWLINE) { consume(cur); }
 }
 
+static char *expect_string(Token **cur, const char *directive) {
+    if (!*cur || (*cur)->type != STRING_LITERAL) {
+        ERROR(*cur, "Expected a string after '.%s'\n", directive);
+    }
+    char *text = (*cur)->str;
+    consume(cur);
+    return text;
+}
+
+// `.func`, `.loc` and `.cost` record where the code around them came from.
+// They emit nothing; codeGen turns them into the object's debug trailer.
+static int parse_debug_directive(Token **cur, AsmBlock *line) {
+    if (!*cur || (*cur)->type != LABEL) return 0;
+    AsmMark mark = {0};
+    mark.at = line->num_instrucitons;
+    if (strcmp((*cur)->str, "func") == 0) {
+        consume(cur);
+        mark.kind = ASM_MARK_FUNC;
+        mark.name = expect_string(cur, "func");
+        mark.file = expect_string(cur, "func");
+    } else if (strcmp((*cur)->str, "loc") == 0) {
+        consume(cur);
+        if (!*cur || (*cur)->type != NUMBER) {
+            ERROR(*cur, "Expected a line number after '.loc'\n");
+        }
+        mark.kind = ASM_MARK_LOC;
+        mark.line = (uint32_t)strtoul((*cur)->str, NULL, 0);
+        consume(cur);
+    } else if (strcmp((*cur)->str, "cost") == 0) {
+        consume(cur);
+        mark.kind = ASM_MARK_COST;
+        mark.name = expect_string(cur, "cost");
+    } else {
+        return 0;
+    }
+    line->marks = realloc(line->marks, sizeof(AsmMark) * (line->mark_count + 1));
+    line->marks[line->mark_count++] = mark;
+    return 1;
+}
+
 // Parse a '.byte' directive sequence and append data bytes to the given label line.
 static void parse_byte_directive(Token **cur, AsmBlock *line) {
     // Current token should be the identifier following '.'
@@ -491,7 +531,7 @@ AsmInstr *instructions(Token **cur) {
 AsmBlock *label(Token **cur) {
     Token *label = *cur;
     consume(cur);
-    AsmBlock *label_inst_line = malloc(sizeof(AsmBlock));
+    AsmBlock *label_inst_line = calloc(1, sizeof(AsmBlock));
     label_inst_line->label = label->str; // Store the label string
     label_inst_line->num_instrucitons = 0; // Initialize the number of instructions to 0
     label_inst_line->inst_list = NULL; // Initialize the list of instructions pointer to NULL
@@ -529,6 +569,7 @@ AsmBlock *label(Token **cur) {
                     (strcmp((*cur)->next->str, "section") == 0 || strcmp((*cur)->next->str, "data") == 0 ||
                      strcmp((*cur)->next->str, "text") == 0)) break;
                 consume(cur);
+                if (parse_debug_directive(cur, label_inst_line)) continue;
                 parse_byte_directive(cur, label_inst_line);
                 continue;
             }

@@ -18,7 +18,7 @@ $(TARGET): $(OBJ)
 	mkdir -p build
 	$(CC) -o $@ $^
 
-%.o: %.c
+%.o: %.c $(wildcard inc/*.h) ../MyLinker/inc/ObjectFormat.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
 test: $(TEST_BIN)

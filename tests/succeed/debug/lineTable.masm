@@ -1,0 +1,13 @@
+export __START__
+__START__:
+  .func "main" "src/main.mln"
+  .loc 3
+  movi r1, 1
+  .loc 4
+  .cost "copy"
+  movi r2, 2
+next:
+  .cost ""
+  movi r3, 3
+  .loc 7
+  halt

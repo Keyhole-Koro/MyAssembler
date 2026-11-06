@@ -262,5 +262,26 @@ void write_object(const char *obj_path, const MachineCode *mc) {
         fwrite(&ce, sizeof(ce), 1, f);
     }
 
+    // debug trailer, for sources that carry `.func`/`.loc`/`.cost`
+    if (mc->debug.row_count > 0) {
+        struct DebugHeader dh = {0};
+        dh.magic = DEBUG_MAGIC;
+        dh.string_size = (uint32_t)mc->debug.string_size;
+        dh.func_count = (uint32_t)mc->debug.func_count;
+        dh.row_count = (uint32_t)mc->debug.row_count;
+        fwrite(&dh, sizeof(dh), 1, f);
+        fwrite(mc->debug.strings, 1, mc->debug.string_size, f);
+        for (size_t i = 0; i < mc->debug.func_count; ++i) {
+            const ObjDebugFunc *src = &mc->debug.funcs[i];
+            struct DebugFunc df = {src->offset, src->name, src->file};
+            fwrite(&df, sizeof(df), 1, f);
+        }
+        for (size_t i = 0; i < mc->debug.row_count; ++i) {
+            const ObjDebugRow *src = &mc->debug.rows[i];
+            struct DebugRow dr = {src->offset, src->file, src->line, src->cost};
+            fwrite(&dr, sizeof(dr), 1, f);
+        }
+    }
+
     fclose(f);
 }

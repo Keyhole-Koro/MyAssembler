@@ -98,6 +98,40 @@ def run_tests(selected=None):
         raise SystemExit(1)
 
 
+def check_line_table():
+    """Debug directives reach the line table and leave the image alone."""
+    source = TESTS_DIR / "succeed" / "debug" / "lineTable.masm"
+    expected = [
+        "file 0 src/main.mln",
+        "func 0x00000000 0 main",
+        "line 0x00000000 0 3 -",
+        "line 0x00000004 0 4 copy",
+        "line 0x00000008 0 4 -",
+        "line 0x0000000C 0 7 -",
+    ]
+    with tempfile.TemporaryDirectory(prefix="myassembler-line-table-") as temporary:
+        directory = Path(temporary)
+        plain = directory / "plain.masm"
+        plain.write_text(
+            "".join(line for line in source.read_text().splitlines(True)
+                    if not line.strip().startswith(".")))
+        images = []
+        for name, path in (("debug", source), ("plain", plain)):
+            obj = directory / f"{name}.mobj"
+            image = directory / f"{name}.bin"
+            run([str(ASM_PATH), str(path), str(directory / f"{name}.prelink"), "--obj", str(obj)])
+            run([str(LINKER_PATH), "--lines", str(directory / f"{name}.lines"), str(image), str(obj)])
+            images.append(image.read_bytes())
+        actual = (directory / "debug.lines").read_text().splitlines()[1:]
+        if actual != expected:
+            status_line("FAIL", f"lineTable expected {expected}, got {actual}", "31")
+            raise SystemExit(1)
+        if images[0] != images[1]:
+            status_line("FAIL", "lineTable directives changed the image", "31")
+            raise SystemExit(1)
+    status_line("PASS", "lineTable rows match and the image is unchanged", "32")
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run MyAssembler integration tests.")
     parser.add_argument("test", nargs="?", help="Optional test case name or source filename")
@@ -110,3 +144,5 @@ if __name__ == "__main__":
         selected = base if ext else args.test
     build_all()
     run_tests(selected)
+    if selected is None:
+        check_line_table()

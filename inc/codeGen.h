@@ -28,6 +28,30 @@ typedef struct {
     uint32_t size;        // chunk size in bytes
 } ObjCollect;
 
+// Debug trailer contents (ObjectFormat.h's DebugFunc and DebugRow). `strings`
+// is the pool that `name`, `file` and `cost` are offsets into.
+typedef struct {
+    uint32_t offset;
+    uint32_t name;
+    uint32_t file;
+} ObjDebugFunc;
+
+typedef struct {
+    uint32_t offset;
+    uint32_t file;
+    uint32_t line;
+    uint32_t cost;
+} ObjDebugRow;
+
+typedef struct {
+    char *strings;
+    size_t string_size;
+    ObjDebugFunc *funcs;
+    size_t func_count;
+    ObjDebugRow *rows;
+    size_t row_count;
+} ObjDebug;
+
 typedef struct {
     uint8_t *code; // raw bytes (text section)
     size_t size;   // number of bytes
@@ -47,6 +71,8 @@ typedef struct {
     size_t collect_count;
     uint8_t *blob;
     size_t blob_size;
+
+    ObjDebug debug;
 } MachineCode;
 
 // Encode a single data byte (mask to 8 bits)
