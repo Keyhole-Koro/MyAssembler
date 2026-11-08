@@ -537,8 +537,9 @@ AsmBlock *label(Token **cur) {
 
     if ((*cur)->type == COLON) {
         consume(cur);
-        if ((*cur) == NULL) return NULL; // Handle end of tokens gracefully
-
+        // The colon may be the file's last token, when its last line is
+        // `label:` with no newline: the block is then empty, as it is when
+        // a newline follows.
         while (*cur) {
             if (is_label_declaration(*cur)) { break; }
             if ((*cur)->type == INSTRUCTION) {

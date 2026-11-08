@@ -148,6 +148,48 @@ void test_dependency_file_uses_import_from_path(void) {
     free(mc.code);
 }
 
+// Assemble `source`, written exactly as given -- a missing final newline
+// included -- to tests/outputs/<name>.masm.
+static MachineCode assemble_source(const char *name, const char *source) {
+    ensure_output_dir();
+    char source_path[PATH_MAX];
+    char binary_path[PATH_MAX];
+    snprintf(source_path, sizeof(source_path), "tests/outputs/%s.masm", name);
+    snprintf(binary_path, sizeof(binary_path), "tests/outputs/%s.bin", name);
+    FILE *file = fopen(source_path, "wb");
+    TEST_ASSERT_NOT_NULL(file);
+    fputs(source, file);
+    fclose(file);
+    return assembler(source_path, binary_path);
+}
+
+// The symbol named `label`, under its own name or the private name it gets,
+// `label-[module:n]`.
+static const ObjSymbol *find_symbol(const MachineCode *mc, const char *label) {
+    size_t length = strlen(label);
+    for (size_t i = 0; i < mc->symbol_count; i++) {
+        const char *name = mc->symbols[i].name;
+        if (strncmp(name, label, length) == 0 &&
+            (name[length] == '\0' ||
+             strncmp(name + length, PRIVATE_LABEL_MARK, sizeof(PRIVATE_LABEL_MARK) - 1) == 0)) {
+            return &mc->symbols[i];
+        }
+    }
+    return NULL;
+}
+
+// A file may end without a newline. Its last line, `end:`, labels the end
+// of the text, as it does when a newline follows.
+void test_label_on_last_line_without_newline(void) {
+    MachineCode mc = assemble_source("labelAtEnd", "__START__:\n  halt\nend:");
+    TEST_ASSERT_EQUAL_size_t(4, mc.size);
+    const ObjSymbol *end = find_symbol(&mc, "end");
+    TEST_ASSERT_NOT_NULL(end);
+    TEST_ASSERT_EQUAL_UINT32(SECTION_TEXT, end->section);
+    TEST_ASSERT_EQUAL_UINT32(4, end->offset);
+    free(mc.code);
+}
+
 static unsigned char *read_whole_file(const char *path, size_t *size) {
     FILE *file = fopen(path, "rb");
     if (!file) return NULL;
@@ -188,5 +230,6 @@ int main(void) {
     RUN_TEST(test_all_samples);
     RUN_TEST(test_dependency_file_uses_import_from_path);
     RUN_TEST(test_object_matches_golden);
+    RUN_TEST(test_label_on_last_line_without_newline);
     return UNITY_END();
 }
