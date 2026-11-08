@@ -411,7 +411,8 @@ AsmInstr *instrRegImm21(Token *opcode, Token *reg1, Token *imm21) {
 AsmInstr *instrRegAppears(Token **cur, Token *opcode, Token *reg1) {
     if ((*cur) && (*cur)->type == COMMA) {
         consume(cur);
-        if ((*cur)->type == REGISTER) {
+        // The comma may be the file's last token.
+        if (*cur && (*cur)->type == REGISTER) {
             Token *reg2 = *cur; // Save the second register
             consume(cur);
             if (strcmp(opcode->str, "cas") == 0 || strcmp(opcode->str, "CAS") == 0) {
@@ -428,11 +429,11 @@ AsmInstr *instrRegAppears(Token **cur, Token *opcode, Token *reg1) {
             }
             return instrRegReg(opcode, reg1, reg2);
 
-        } else if ((*cur)->type == NUMBER || (*cur)->type == NEGATIVE_NUMBER) {
+        } else if (*cur && ((*cur)->type == NUMBER || (*cur)->type == NEGATIVE_NUMBER)) {
             Token *imm21 = *cur; // Save the immediate value
             consume(cur);
             return instrRegImm21(opcode, reg1, imm21);
-        } else if (is_symbol_token(*cur) && (*cur)->next != NULL && (*cur)->next->type != COLON) {
+        } else if (is_symbol_token(*cur) && !is_label_declaration(*cur)) {
             // reg, label -> treat as immediate fixup for label address
             AsmInstr *instrList = malloc(sizeof(AsmInstr));
             InstrRegLabel *rl = malloc(sizeof(InstrRegLabel));
@@ -453,7 +454,8 @@ AsmInstr *instrRegAppears(Token **cur, Token *opcode, Token *reg1) {
             return instrList;
         
         } else {
-            ERROR(*cur, "Expected REGISTER or NUMBER after COMMA but found: %s\n", (*cur)->str);
+            ERROR(*cur, "Expected REGISTER or NUMBER after COMMA but found: %s\n",
+                  *cur ? (*cur)->str : "<eof>");
             exit(EXIT_FAILURE);
         }
     } else {
@@ -498,12 +500,9 @@ AsmInstr *instructions(Token **cur) {
             consume(cur);
             return instrImm26(opcode, imm26);
             
-        } else if (is_symbol_token(*cur)
-            // messy code
-            // Check if the current token is a not label declaration
-            && (*cur)->next != NULL
-            && (*cur)->next->type != COLON) {
-
+        } else if (is_symbol_token(*cur) && !is_label_declaration(*cur)) {
+            // A label operand -- the file's last token, maybe. A label
+            // declaration instead starts the next block.
             Token *label = *cur; // Save the label
             consume(cur);
             return instrLabel(opcode, label);

@@ -7,6 +7,8 @@
 #include <dirent.h>
 #include <sys/stat.h>   // mkdir / stat
 #include <sys/types.h>
+#include <sys/wait.h>   // waitpid
+#include <unistd.h>     // fork
 #include <limits.h>
 
 #if defined(_WIN32) || defined(_WIN64)
@@ -148,19 +150,54 @@ void test_dependency_file_uses_import_from_path(void) {
     free(mc.code);
 }
 
-// Assemble `source`, written exactly as given -- a missing final newline
-// included -- to tests/outputs/<name>.masm.
-static MachineCode assemble_source(const char *name, const char *source) {
+// Write `source` exactly as given -- a missing final newline included -- to
+// tests/outputs/<name>.masm, and name the binary beside it.
+// `source_path` and `binary_path` hold PATH_MAX bytes each.
+static void write_source(const char *name, const char *source, char *source_path, char *binary_path) {
     ensure_output_dir();
-    char source_path[PATH_MAX];
-    char binary_path[PATH_MAX];
-    snprintf(source_path, sizeof(source_path), "tests/outputs/%s.masm", name);
-    snprintf(binary_path, sizeof(binary_path), "tests/outputs/%s.bin", name);
+    snprintf(source_path, PATH_MAX, "tests/outputs/%s.masm", name);
+    snprintf(binary_path, PATH_MAX, "tests/outputs/%s.bin", name);
     FILE *file = fopen(source_path, "wb");
     TEST_ASSERT_NOT_NULL(file);
     fputs(source, file);
     fclose(file);
+}
+
+static MachineCode assemble_source(const char *name, const char *source) {
+    char source_path[PATH_MAX];
+    char binary_path[PATH_MAX];
+    write_source(name, source, source_path, binary_path);
     return assembler(source_path, binary_path);
+}
+
+// Assembling `source` must stop with an error saying `message` -- exit
+// status 1, not a crash. The assembler exits on an error, so it runs in a
+// child process, its errors going to tests/outputs/<name>.err.
+static void assert_rejected(const char *name, const char *source, const char *message) {
+    char source_path[PATH_MAX];
+    char binary_path[PATH_MAX];
+    char error_path[PATH_MAX];
+    write_source(name, source, source_path, binary_path);
+    snprintf(error_path, sizeof(error_path), "tests/outputs/%s.err", name);
+    fflush(NULL);
+    pid_t child = fork();
+    TEST_ASSERT_TRUE(child >= 0);
+    if (child == 0) {
+        if (!freopen(error_path, "w", stderr)) _exit(2);
+        assembler(source_path, binary_path);
+        _exit(0);
+    }
+    int status = 0;
+    TEST_ASSERT_EQUAL_INT(child, waitpid(child, &status, 0));
+    TEST_ASSERT_TRUE_MESSAGE(WIFEXITED(status), "the assembler crashed");
+    TEST_ASSERT_EQUAL_INT(1, WEXITSTATUS(status));
+    FILE *file = fopen(error_path, "r");
+    TEST_ASSERT_NOT_NULL(file);
+    char errors[4096];
+    size_t count = fread(errors, 1, sizeof(errors) - 1, file);
+    errors[count] = '\0';
+    fclose(file);
+    TEST_ASSERT_NOT_NULL_MESSAGE(strstr(errors, message), errors);
 }
 
 // The symbol named `label`, under its own name or the private name it gets,
@@ -188,6 +225,29 @@ void test_label_on_last_line_without_newline(void) {
     TEST_ASSERT_EQUAL_UINT32(SECTION_TEXT, end->section);
     TEST_ASSERT_EQUAL_UINT32(4, end->offset);
     free(mc.code);
+}
+
+// A label operand may be the file's last token too.
+void test_operand_on_last_line_without_newline(void) {
+    MachineCode jump = assemble_source("jumpAtEnd", "__START__:\n  jmp __START__");
+    const uint8_t jump_code[] = {0x34, 0x00, 0x00, 0x00}; // jmp, offset 0
+    TEST_ASSERT_EQUAL_size_t(sizeof(jump_code), jump.size);
+    TEST_ASSERT_EQUAL_HEX8_ARRAY(jump_code, jump.code, sizeof(jump_code));
+    free(jump.code);
+
+    MachineCode load = assemble_source("loadAtEnd", "__START__:\n  movi r1, __START__");
+    const uint8_t load_code[] = {0x08, 0x20, 0x00, 0x00}; // movi r1, 0, relocated
+    TEST_ASSERT_EQUAL_size_t(sizeof(load_code), load.size);
+    TEST_ASSERT_EQUAL_HEX8_ARRAY(load_code, load.code, sizeof(load_code));
+    TEST_ASSERT_EQUAL_size_t(1, load.reloc_count);
+    TEST_ASSERT_EQUAL_UINT32(RELOC_ABSOLUTE, load.relocs[0].type);
+    free(load.code);
+}
+
+// A file that ends straight after `mov r1,` is an error, not a crash.
+void test_missing_operand_at_end_of_file_is_an_error(void) {
+    assert_rejected("operandMissingAtEnd", "__START__:\n  mov r1,",
+                    "Expected REGISTER or NUMBER after COMMA but found: <eof>");
 }
 
 typedef struct {
@@ -295,6 +355,8 @@ int main(void) {
     RUN_TEST(test_dependency_file_uses_import_from_path);
     RUN_TEST(test_object_matches_golden);
     RUN_TEST(test_label_on_last_line_without_newline);
+    RUN_TEST(test_operand_on_last_line_without_newline);
+    RUN_TEST(test_missing_operand_at_end_of_file_is_an_error);
     RUN_TEST(test_negative_number_ends_at_its_last_digit);
     RUN_TEST(test_negative_numbers_in_operands_and_lists);
     return UNITY_END();
