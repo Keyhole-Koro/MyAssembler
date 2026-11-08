@@ -18,6 +18,32 @@ int32_t substraction_26bit(uint32_t a, uint32_t b) {
     return sign_extend_26bit(result);
 }
 
+const char *path_basename(const char *path) {
+    const char *base = path;
+    for (const char *p = path; *p; p++) {
+        if (*p == '/' || *p == '\\') base = p + 1;
+    }
+    return base;
+}
+
+void path_stem(const char *path, char *out, size_t size) {
+    const char *base = path_basename(path);
+    size_t len = strlen(base);
+    if (len >= size) len = size - 1;
+    memcpy(out, base, len);
+    out[len] = '\0';
+    char *dot = strrchr(out, '.');
+    if (dot) *dot = '\0';
+}
+
+void path_beside(const char *beside, const char *name, const char *suffix, char *out, size_t size) {
+    size_t dir_len = beside ? (size_t)(path_basename(beside) - beside) : 0;
+    if (dir_len >= size) dir_len = size - 1;
+    if (dir_len > 0) memcpy(out, beside, dir_len);
+    out[dir_len] = '\0';
+    snprintf(out + dir_len, size - dir_len, "%s%s", name, suffix);
+}
+
 const char* token_type_to_string(TokenType type) {
     switch (type) {
         case COLON:       return "COLON";

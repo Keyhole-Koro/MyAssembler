@@ -297,12 +297,7 @@ uint32_t encodeInstruction(LabelMap *map, AsmInstr *inst_list, uint32_t currentP
 }
 
 static void build_module_tag(const char *module_tag, char *out, size_t out_size) {
-    const char *base = module_tag ? module_tag : "obj";
-    const char *slash = strrchr(base, '/');
-    const char *backslash = strrchr(base, '\\');
-    if (slash && backslash) base = (slash > backslash) ? slash + 1 : backslash + 1;
-    else if (slash) base = slash + 1;
-    else if (backslash) base = backslash + 1;
+    const char *base = path_basename(module_tag ? module_tag : "obj");
 
     size_t len = 0;
     while (base[len] && base[len] != '.' && len + 1 < out_size) {

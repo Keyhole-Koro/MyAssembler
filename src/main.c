@@ -10,31 +10,14 @@
 static void write_hex_dump(const char *bin_path, const char *custom_path, const uint8_t *buf, size_t size) {
     if (!buf || size == 0) return;
 
-    // Derive <dir>/<stem>.txt from the provided binary path
-    const char *slash1 = strrchr(bin_path, '/');
-    const char *slash2 = strrchr(bin_path, '\\');
-    const char *base = bin_path;
-    if (slash1 && slash2) base = (slash1 > slash2) ? slash1 + 1 : slash2 + 1;
-    else if (slash1) base = slash1 + 1;
-    else if (slash2) base = slash2 + 1;
-
-    char stem[256];
-    size_t blen = strlen(base);
-    if (blen >= sizeof(stem)) blen = sizeof(stem) - 1;
-    memcpy(stem, base, blen);
-    stem[blen] = '\0';
-    char *dot = strrchr(stem, '.');
-    if (dot) *dot = '\0';
-
     char out_path[512];
     if (custom_path && custom_path[0]) {
         snprintf(out_path, sizeof(out_path), "%s", custom_path);
     } else {
-        size_t dir_len = (size_t)(base - bin_path);
-        if (dir_len >= sizeof(out_path)) dir_len = sizeof(out_path) - 1;
-        memcpy(out_path, bin_path, dir_len);
-        out_path[dir_len] = '\0';
-        snprintf(out_path + dir_len, sizeof(out_path) - dir_len, "%s.txt", stem[0] ? stem : "output");
+        // <dir>/<stem>.txt from the binary's path
+        char stem[256];
+        path_stem(bin_path, stem, sizeof(stem));
+        path_beside(bin_path, stem[0] ? stem : "output", ".txt", out_path, sizeof(out_path));
     }
 
     FILE *txt = fopen(out_path, "w");

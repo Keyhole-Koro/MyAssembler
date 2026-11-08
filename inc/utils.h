@@ -11,6 +11,16 @@ int32_t substraction_26bit(uint32_t a, uint32_t b);
 
 const char* token_type_to_string(TokenType type);
 
+// The file name in `path`: whatever follows its last '/' or '\\'.
+const char *path_basename(const char *path);
+
+// The file name in `path` without its extension, cut to fit `size` first.
+void path_stem(const char *path, char *out, size_t size);
+
+// `<name><suffix>` in the directory of `beside` (none if it is NULL or has no
+// directory), written to `out`.
+void path_beside(const char *beside, const char *name, const char *suffix, char *out, size_t size);
+
 // Forward decl to avoid heavy includes here
 typedef struct AsmBlock AsmBlock;
 
