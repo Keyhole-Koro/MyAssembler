@@ -1,0 +1,60 @@
+; Every part of an LNK3 object: text, data and collected-section chunks;
+; public, exported and private labels; all three relocation types; imports;
+; and the debug trailer. tests/test_assemble.c checks that the object written
+; for this file matches objectLayout.mobj byte for byte.
+import ext_fn, ext_data, ext_word
+export f_local, local_data, rows
+
+__START__:
+  .func "main" "src/main.mln"
+  .loc 3
+  call ext_fn
+  movi r1, ext_data
+  movi r2, local_data
+  .loc 4
+  .cost "copy"
+  jmp f_local
+  mov r4, private_text
+  .cost ""
+f_local:
+  movi r3, table
+  jz f_local
+  jnz private_text
+  halt
+private_text:
+  .loc 9
+  movi r5, rows2
+  movi r6, rows
+  halt
+
+.data
+local_data:
+  .byte 1, 2, 3
+  .word ext_word, local_data, 7, private_data
+private_data:
+  .byte 0x41
+  .word 0x7fffffff, f_local, rows
+.text
+
+.section annotations
+rows:
+  .word f_local, rows, ext_word, local_data, 5
+.section annotations
+rows2:
+  .byte 9
+  .word table, rows
+.section notes
+note:
+  .word 3, note, private_text
+
+table:
+  .byte 0x41, 0x42
+  .word rows2
+f_after:
+  .func "after" "src/other.mln"
+  .loc 1
+  add r1, r2
+  cas r1, r2, r3
+  push r1
+  pop lr
+  halt

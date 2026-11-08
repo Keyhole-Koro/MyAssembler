@@ -148,9 +148,45 @@ void test_dependency_file_uses_import_from_path(void) {
     free(mc.code);
 }
 
+static unsigned char *read_whole_file(const char *path, size_t *size) {
+    FILE *file = fopen(path, "rb");
+    if (!file) return NULL;
+    fseek(file, 0, SEEK_END);
+    long length = ftell(file);
+    fseek(file, 0, SEEK_SET);
+    unsigned char *bytes = malloc(length > 0 ? (size_t)length : 1);
+    *size = bytes ? fread(bytes, 1, (size_t)length, file) : 0;
+    fclose(file);
+    return bytes;
+}
+
+// The object written for tests/golden/objectLayout.masm must not change by a
+// byte unless the object format does. After such a change, regenerate it:
+//   ./build/myas tests/golden/objectLayout.masm tests/outputs/objectLayout.mbin \
+//       --obj tests/golden/objectLayout.mobj
+void test_object_matches_golden(void) {
+    ensure_output_dir();
+    MachineCode mc = assembler("tests/golden/objectLayout.masm", "tests/outputs/objectLayout.mbin");
+    write_object("tests/outputs/objectLayout.mobj", &mc);
+
+    size_t expected_size = 0;
+    size_t actual_size = 0;
+    unsigned char *expected = read_whole_file("tests/golden/objectLayout.mobj", &expected_size);
+    unsigned char *actual = read_whole_file("tests/outputs/objectLayout.mobj", &actual_size);
+    TEST_ASSERT_NOT_NULL(expected);
+    TEST_ASSERT_NOT_NULL(actual);
+    TEST_ASSERT_EQUAL_size_t(expected_size, actual_size);
+    TEST_ASSERT_EQUAL_MEMORY(expected, actual, expected_size);
+
+    free(expected);
+    free(actual);
+    free(mc.code);
+}
+
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_all_samples);
     RUN_TEST(test_dependency_file_uses_import_from_path);
+    RUN_TEST(test_object_matches_golden);
     return UNITY_END();
 }
