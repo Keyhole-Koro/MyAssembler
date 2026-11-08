@@ -357,228 +357,236 @@ static void collect_debug(ObjDebug *debug, const AsmBlock *block, uint32_t block
     }
 }
 
-MachineCode codeGen(AsmBlock *head, const char **imports, size_t import_count, const char **exports, size_t export_count, const char *module_tag) {
-    LabelMap labelMap;
-    LabelSymbolMap labelSymbolMap;
-    SymbolVec symbols = {0};
-    RelocVec relocs = {0};
-    ObjCollect *collects = NULL;
-    size_t collect_count = 0;
-    char module_name[32];
+// TEXT, DATA and COLLECT: what codeGen lays out and writes per section.
+#define SECTION_COUNT (SECTION_COLLECT + 1)
 
-    initLabelMap(&labelMap);
-    initLabelSymbolMap(&labelSymbolMap);
-    build_module_tag(module_tag, module_name, sizeof(module_name));
+// What codeGen builds up as it goes through the blocks.
+typedef struct {
+    const char **imports;
+    size_t import_count;
+    const char **exports;
+    size_t export_count;
+    char module_name[32];          // tags this object's private labels
+    uint32_t next_private;         // number of the next private label
+    LabelMap labels;               // label -> offset in its block's section
+    LabelSymbolMap symbol_names;   // label -> its name in the symbol table
+    SymbolVec symbols;
+    RelocVec relocs;
+    ObjCollect *collects;
+    size_t collect_count;
+    ObjDebug debug;
+    uint32_t size[SECTION_COUNT];  // bytes laid out in each section
+} CodeGen;
 
-    // First pass: assign addresses to labels. A `.section` block's payload
-    // goes to the collected-section blob, a separate address space the
-    // linker relocates chunk by chunk; everything else is TEXT.
-    uint32_t pc = 0;
-    uint32_t blob_pc = 0;
-    uint32_t data_pc = 0;
-    uint32_t local_label_counter = 1;
-    ObjDebug debug = {0};
-    uint32_t debug_file = 0, debug_line = 0, debug_cost = 0;
-    debug_string(&debug, "");
-    for (AsmBlock *line = head; line; line = line->next) {
+static bool label_defined(CodeGen *cg, const char *label) {
+    uint32_t addr;
+    return getLabelAddress(&cg->labels, label, &addr);
+}
 
-        if (line->label && strlen(line->label) > 0) {
-            uint32_t data_bytes = (uint32_t)line->data_count;
-            uint32_t padded_data = (data_bytes + 3u) & ~3u;
-            uint32_t payload = padded_data + (uint32_t)line->word_count * sizeof(uint32_t);
-            uint32_t at = pc;
-            if (line->section == SECTION_COLLECT) {
-                if (line->num_instrucitons > 0) {
-                    fprintf(stderr, "'.section %s' block '%s' must hold only data (.byte/.word), not instructions\n",
-                            line->section_name, line->label);
-                    exit(EXIT_FAILURE);
-                }
-                at = blob_pc;
-                collects = realloc(collects, sizeof(ObjCollect) * (collect_count + 1));
-                collects[collect_count].name = line->section_name;
-                collects[collect_count].offset = blob_pc;
-                collects[collect_count].size = payload;
-                collect_count++;
-            } else if (line->section == SECTION_DATA) {
-                if (line->num_instrucitons > 0) {
-                    fprintf(stderr, "'.data' block '%s' must hold only data (.byte/.word), not instructions\n",
-                            line->label);
-                    exit(EXIT_FAILURE);
-                }
-                at = data_pc;
-            }
-            mapLabelToAddress(&labelMap, line->label, at);
-            if (is_public_label(line->label) || is_exported(line->label, exports, export_count)) {
-                labelsymbolmap_put(&labelSymbolMap, line->label, line->label);
-                symbolvec_push(&symbols, line->label, SYMBOL_DEFINED, line->section, at);
-            } else {
-                char unique_name[96];
-                snprintf(unique_name, sizeof(unique_name), "%s-[%s:%u]", line->label, module_name, local_label_counter++);
-                labelsymbolmap_put(&labelSymbolMap, line->label, unique_name);
-                symbolvec_push(&symbols, unique_name, SYMBOL_DEFINED, line->section, at);
-            }
-            if (line->section == SECTION_COLLECT) {
-                blob_pc += payload;
-            } else if (line->section == SECTION_DATA) {
-                data_pc += payload;
-            } else {
-                collect_debug(&debug, line, pc, &debug_file, &debug_line, &debug_cost);
-                pc += (line->num_instrucitons) * sizeof(uint32_t);
-                pc += payload; // data bytes (word-aligned for loader) and words
-            }
-        }
+// The name `label` has in the symbol table: the private name it was given,
+// or itself.
+static const char *symbol_name(const CodeGen *cg, const char *label) {
+    const char *name = labelsymbolmap_get(&cg->symbol_names, label);
+    return name ? name : label;
+}
+
+// A label this file refers to must be one it defines or imports. `where`
+// adds what referred to it to the message.
+static void require_symbol(CodeGen *cg, const char *label, const char *where) {
+    if (label_defined(cg, label) || is_imported(label, cg->imports, cg->import_count)) return;
+    fprintf(stderr, "Undefined symbol '%s'%s: not defined and not imported (add 'import %s')\n",
+            label, where, label);
+    exit(EXIT_FAILURE);
+}
+
+// Words are big-endian in memory, instructions included.
+static void put_be32(uint8_t *out, uint32_t *at, uint32_t value) {
+    out[(*at)++] = (uint8_t)((value >> 24) & 0xFF);
+    out[(*at)++] = (uint8_t)((value >> 16) & 0xFF);
+    out[(*at)++] = (uint8_t)((value >> 8) & 0xFF);
+    out[(*at)++] = (uint8_t)(value & 0xFF);
+}
+
+// The bytes a block's `.byte` and `.word` directives emit: the bytes padded
+// to a word boundary, then the words.
+static uint32_t payload_size(const AsmBlock *block) {
+    uint32_t padded_data = ((uint32_t)block->data_count + 3u) & ~3u;
+    return padded_data + (uint32_t)block->word_count * sizeof(uint32_t);
+}
+
+// A `.data` or `.section` block holds data only.
+static void check_data_only(const AsmBlock *block) {
+    if (block->section == SECTION_TEXT || block->num_instrucitons == 0) return;
+    if (block->section == SECTION_COLLECT) {
+        fprintf(stderr, "'.section %s' block '%s' must hold only data (.byte/.word), not instructions\n",
+                block->section_name, block->label);
+    } else {
+        fprintf(stderr, "'.data' block '%s' must hold only data (.byte/.word), not instructions\n",
+                block->label);
     }
+    exit(EXIT_FAILURE);
+}
 
-    uint32_t total_bytes = pc; // total output size in bytes
-    uint32_t blob_bytes = blob_pc;
-    uint32_t data_bytes_total = data_pc;
+static void add_collect(CodeGen *cg, char *name, uint32_t offset, uint32_t size) {
+    cg->collects = realloc(cg->collects, sizeof(ObjCollect) * (cg->collect_count + 1));
+    cg->collects[cg->collect_count].name = name;
+    cg->collects[cg->collect_count].offset = offset;
+    cg->collects[cg->collect_count].size = size;
+    cg->collect_count++;
+}
 
-    for (size_t i = 0; i < export_count; i++) {
-        uint32_t addr;
-        if (!getLabelAddress(&labelMap, exports[i], &addr)) {
-            fprintf(stderr, "Exported symbol '%s' is not defined in this file\n", exports[i]);
+// Put a block's label at `at` in the block's section, and in the symbol
+// table under its own name if it is public -- an `f_` function, __START__,
+// or exported -- or else under a name private to this object.
+static void define_label(CodeGen *cg, const AsmBlock *block, uint32_t at) {
+    mapLabelToAddress(&cg->labels, block->label, at);
+    if (is_public_label(block->label) || is_exported(block->label, cg->exports, cg->export_count)) {
+        labelsymbolmap_put(&cg->symbol_names, block->label, block->label);
+        symbolvec_push(&cg->symbols, block->label, SYMBOL_DEFINED, block->section, at);
+    } else {
+        char unique_name[96];
+        snprintf(unique_name, sizeof(unique_name), "%s-[%s:%u]", block->label, cg->module_name, cg->next_private++);
+        labelsymbolmap_put(&cg->symbol_names, block->label, unique_name);
+        symbolvec_push(&cg->symbols, unique_name, SYMBOL_DEFINED, block->section, at);
+    }
+}
+
+// First pass: give every label its offset in its block's section -- TEXT,
+// DATA, or the collected-section blob, which the linker places chunk by
+// chunk -- and collect the symbols, the chunks and the debug rows.
+static void lay_out_blocks(CodeGen *cg, AsmBlock *head) {
+    uint32_t debug_file = 0, debug_line = 0, debug_cost = 0;
+    for (AsmBlock *block = head; block; block = block->next) {
+        if (!block->label || strlen(block->label) == 0) continue;
+        check_data_only(block);
+        uint32_t at = cg->size[block->section];
+        uint32_t payload = payload_size(block);
+        if (block->section == SECTION_COLLECT) add_collect(cg, block->section_name, at, payload);
+        define_label(cg, block, at);
+        if (block->section == SECTION_TEXT) {
+            collect_debug(&cg->debug, block, at, &debug_file, &debug_line, &debug_cost);
+        }
+        cg->size[block->section] += (uint32_t)block->num_instrucitons * sizeof(uint32_t) + payload;
+    }
+}
+
+static void check_exports(CodeGen *cg) {
+    for (size_t i = 0; i < cg->export_count; i++) {
+        if (!label_defined(cg, cg->exports[i])) {
+            fprintf(stderr, "Exported symbol '%s' is not defined in this file\n", cg->exports[i]);
             exit(EXIT_FAILURE);
         }
     }
+}
 
-    // Record imported symbols as undefined in the symbol table (avoid
-    // duplicates). An import has no section or offset: both are written as 0.
-    for (size_t i = 0; i < import_count; i++) {
-        if (symbolvec_index(&symbols, imports[i]) >= 0) continue;
-        symbolvec_push(&symbols, imports[i], SYMBOL_UNDEFINED, 0, 0);
+// Imports go in the symbol table as undefined, once each. An import has no
+// section or offset: both are written as 0.
+static void add_imports(CodeGen *cg) {
+    for (size_t i = 0; i < cg->import_count; i++) {
+        if (symbolvec_index(&cg->symbols, cg->imports[i]) >= 0) continue;
+        symbolvec_push(&cg->symbols, cg->imports[i], SYMBOL_UNDEFINED, 0, 0);
     }
-    uint8_t *machineCode = malloc(total_bytes ? total_bytes : 1);
-    if (!machineCode) {
-        perror("Failed to allocate machine code buffer");
+}
+
+static uint8_t *alloc_section(uint32_t size, const char *failure) {
+    uint8_t *bytes = malloc(size ? size : 1);
+    if (!bytes) {
+        perror(failure);
         exit(EXIT_FAILURE);
     }
-    uint8_t *blob = malloc(blob_bytes ? blob_bytes : 1);
-    if (!blob) {
-        perror("Failed to allocate collected-section buffer");
-        exit(EXIT_FAILURE);
+    return bytes;
+}
+
+// Encode the instruction at `pc`. A label operand this file defines is
+// resolved here: a jump's offset, or MOVI's address, which also gets an
+// ABSOLUTE relocation because the linker moves the text. For an imported
+// label the field is left 0 and the relocation says what goes there.
+static uint32_t encode_at(CodeGen *cg, AsmInstr *inst, uint32_t pc) {
+    if (inst->needs_fixup && inst->kind == INSTR_LABEL) {
+        InstrLabel jump = inst->instruction->label;
+        if (label_defined(cg, jump.label)) return encodeLabel(&cg->labels, jump, pc);
+        require_symbol(cg, jump.label, "");
+        relocvec_push(&cg->relocs, pc, jump.label, RELOC_RELATIVE, SECTION_TEXT);
+        return ENCODE(jump.opcode, 26);
     }
-    uint32_t blob_at = 0;
-    uint8_t *data_out = malloc(data_bytes_total ? data_bytes_total : 1);
-    if (!data_out) {
-        perror("Failed to allocate data section buffer");
-        exit(EXIT_FAILURE);
+    if (inst->needs_fixup && inst->kind == INSTR_REGLABEL) {
+        const char *label = inst->instruction->reglabel.label;
+        require_symbol(cg, label, "");
+        uint32_t encoded = encodeInstruction(&cg->labels, inst, pc);
+        relocvec_push(&cg->relocs, pc, symbol_name(cg, label), RELOC_ABSOLUTE, SECTION_TEXT);
+        return encoded;
     }
-    uint32_t data_at = 0;
+    return encodeInstruction(&cg->labels, inst, pc);
+}
 
-    // Second pass: encode instructions
-    pc = 0;
-    for (AsmBlock *line = head; line; line = line->next) {
-        for (AsmInstr *inst = line->inst_list; inst; inst = inst->next) {
-            uint32_t encoded;
-            if (inst->needs_fixup) {
-                if (inst->kind == INSTR_LABEL) {
-                    char *label = inst->instruction->label.label;
-                    uint32_t addr;
-                    if (getLabelAddress(&labelMap, label, &addr)) {
-                        encoded = encodeLabel(&labelMap, inst->instruction->label, pc);
-                    } else {
-                        if (!is_imported(label, imports, import_count)) {
-                            fprintf(stderr, "Undefined symbol '%s': not defined and not imported (add 'import %s')\n", label, label);
-                            exit(EXIT_FAILURE);
-                        }
-                        // unresolved external: placeholder with opcode, record relative reloc
-                        encoded = ENCODE(inst->instruction->label.opcode, 26);
-                        relocvec_push(&relocs, pc, label, RELOC_RELATIVE, SECTION_TEXT);
-                    }
-                } else if (inst->kind == INSTR_REGLABEL) {
-                    char *label = inst->instruction->reglabel.label;
-                    uint32_t addr;
-                    const char *symbol_name = labelsymbolmap_get(&labelSymbolMap, label);
-                    if (!symbol_name) symbol_name = label;
-                    if (getLabelAddress(&labelMap, label, &addr)) {
-                        encoded = encodeInstruction(&labelMap, inst, pc);
-                        relocvec_push(&relocs, pc, symbol_name, RELOC_ABSOLUTE, SECTION_TEXT);
-                    } else {
-                        if (!is_imported(label, imports, import_count)) {
-                            fprintf(stderr, "Undefined symbol '%s': not defined and not imported (add 'import %s')\n", label, label);
-                            exit(EXIT_FAILURE);
-                        }
-                        encoded = encodeInstruction(&labelMap, inst, pc); // returns opcode/reg, imm=0
-                        relocvec_push(&relocs, pc, symbol_name, RELOC_ABSOLUTE, SECTION_TEXT);
-                    }
-                } else {
-                    encoded = encodeInstruction(&labelMap, inst, pc);
-                }
-            } else {
-                encoded = encodeInstruction(&labelMap, inst, pc);
-            }
-
-            // Write 4 bytes in Big Endian
-            machineCode[pc++] = (uint8_t)((encoded >> 24) & 0xFF);
-            machineCode[pc++] = (uint8_t)((encoded >> 16) & 0xFF);
-            machineCode[pc++] = (uint8_t)((encoded >> 8) & 0xFF);
-            machineCode[pc++] = (uint8_t)(encoded & 0xFF);
-        }
-
-        // The payload's destination: TEXT, DATA for a `.data` block, or the
-        // blob for a `.section` block.
-        uint8_t *dest = line->section == SECTION_COLLECT ? blob
-                      : line->section == SECTION_DATA ? data_out : machineCode;
-        uint32_t *cursor = line->section == SECTION_COLLECT ? &blob_at
-                         : line->section == SECTION_DATA ? &data_at : &pc;
-
-        // Append raw data bytes if present
-        if (line->data_count > 0) {
-            size_t data_bytes = line->data_count;
-            size_t padded_data = (data_bytes + 3u) & ~3u;
-            for (size_t i = 0; i < padded_data; i += 4) {
-                uint8_t block[4] = {0, 0, 0, 0};
-                for (size_t j = 0; j < 4; ++j) {
-                    size_t idx = i + j;
-                    if (idx < data_bytes) {
-                        block[j] = encodeByte(line->data[idx]);
-                    }
-                }
-                dest[(*cursor)++] = block[0];
-                dest[(*cursor)++] = block[1];
-                dest[(*cursor)++] = block[2];
-                dest[(*cursor)++] = block[3];
-            }
-        }
-
-        // Append .word payload: big-endian like everything else in memory.
-        // A symbol word is written as 0 and patched by the linker with the
-        // symbol's final address, in full (RELOC_WORD32).
-        for (size_t i = 0; i < line->word_count; ++i) {
-            const AsmWord *w = &line->words[i];
-            uint32_t value = w->value;
-            if (w->symbol) {
-                uint32_t addr;
-                const char *symbol_name = labelsymbolmap_get(&labelSymbolMap, w->symbol);
-                if (!symbol_name) symbol_name = w->symbol;
-                if (!getLabelAddress(&labelMap, w->symbol, &addr) &&
-                    !is_imported(w->symbol, imports, import_count)) {
-                    fprintf(stderr, "Undefined symbol '%s' in .word: not defined and not imported (add 'import %s')\n", w->symbol, w->symbol);
-                    exit(EXIT_FAILURE);
-                }
-                relocvec_push(&relocs, *cursor, symbol_name, RELOC_WORD32, line->section);
-                value = 0;
-            }
-            dest[(*cursor)++] = (uint8_t)((value >> 24) & 0xFF);
-            dest[(*cursor)++] = (uint8_t)((value >> 16) & 0xFF);
-            dest[(*cursor)++] = (uint8_t)((value >> 8) & 0xFF);
-            dest[(*cursor)++] = (uint8_t)(value & 0xFF);
-        }
+// Write a block's `.byte` and `.word` payload at `*at` in `out`, its
+// section. A word naming a symbol is written as 0 with a WORD32 relocation:
+// the linker writes the symbol's final address there in full.
+static void emit_payload(CodeGen *cg, const AsmBlock *block, uint8_t *out, uint32_t *at) {
+    uint32_t padded_data = ((uint32_t)block->data_count + 3u) & ~3u;
+    for (uint32_t i = 0; i < padded_data; ++i) {
+        out[(*at)++] = i < block->data_count ? encodeByte(block->data[i]) : 0;
     }
+    for (size_t i = 0; i < block->word_count; ++i) {
+        const AsmWord *word = &block->words[i];
+        uint32_t value = word->value;
+        if (word->symbol) {
+            require_symbol(cg, word->symbol, " in .word");
+            relocvec_push(&cg->relocs, *at, symbol_name(cg, word->symbol), RELOC_WORD32, block->section);
+            value = 0;
+        }
+        put_be32(out, at, value);
+    }
+}
+
+// Second pass: encode every block's instructions into TEXT and write its
+// payload to its own section.
+static void emit_blocks(CodeGen *cg, AsmBlock *head, uint8_t *out[SECTION_COUNT]) {
+    uint32_t at[SECTION_COUNT] = {0};
+    for (AsmBlock *block = head; block; block = block->next) {
+        for (AsmInstr *inst = block->inst_list; inst; inst = inst->next) {
+            uint32_t encoded = encode_at(cg, inst, at[SECTION_TEXT]);
+            put_be32(out[SECTION_TEXT], &at[SECTION_TEXT], encoded);
+        }
+        emit_payload(cg, block, out[block->section], &at[block->section]);
+    }
+}
+
+MachineCode codeGen(AsmBlock *head, const char **imports, size_t import_count, const char **exports, size_t export_count, const char *module_tag) {
+    CodeGen cg = {0};
+    cg.imports = imports;
+    cg.import_count = import_count;
+    cg.exports = exports;
+    cg.export_count = export_count;
+    cg.next_private = 1;
+    initLabelMap(&cg.labels);
+    initLabelSymbolMap(&cg.symbol_names);
+    build_module_tag(module_tag, cg.module_name, sizeof(cg.module_name));
+    debug_string(&cg.debug, "");
+
+    lay_out_blocks(&cg, head);
+    check_exports(&cg);
+    add_imports(&cg);
+
+    uint8_t *out[SECTION_COUNT];
+    out[SECTION_TEXT] = alloc_section(cg.size[SECTION_TEXT], "Failed to allocate machine code buffer");
+    out[SECTION_COLLECT] = alloc_section(cg.size[SECTION_COLLECT], "Failed to allocate collected-section buffer");
+    out[SECTION_DATA] = alloc_section(cg.size[SECTION_DATA], "Failed to allocate data section buffer");
+    emit_blocks(&cg, head, out);
 
     MachineCode result = {0};
-    result.code = machineCode;
-    result.size = total_bytes;
-    result.data = data_out;
-    result.data_size = data_bytes_total;
-    result.symbols = symbols.items;
-    result.symbol_count = symbols.count;
-    result.relocs = relocs.items;
-    result.reloc_count = relocs.count;
-    result.collects = collects;
-    result.collect_count = collect_count;
-    result.blob = blob;
-    result.blob_size = blob_bytes;
-    result.debug = debug;
+    result.code = out[SECTION_TEXT];
+    result.size = cg.size[SECTION_TEXT];
+    result.data = out[SECTION_DATA];
+    result.data_size = cg.size[SECTION_DATA];
+    result.symbols = cg.symbols.items;
+    result.symbol_count = cg.symbols.count;
+    result.relocs = cg.relocs.items;
+    result.reloc_count = cg.relocs.count;
+    result.collects = cg.collects;
+    result.collect_count = cg.collect_count;
+    result.blob = out[SECTION_COLLECT];
+    result.blob_size = cg.size[SECTION_COLLECT];
+    result.debug = cg.debug;
     return result;
 }
