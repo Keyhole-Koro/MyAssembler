@@ -38,10 +38,6 @@ bool is_alphaOrUnderbarOrNumber(char c) {
     return is_alpha(c) || c == '_' || is_number(c);
 }
 
-bool isTab(char c) {
-    return c == '\t';
-}
-
 char* itostr(long value) {
     static char str[32];  // Static buffer, large enough for most integers
     snprintf(str, sizeof(str), "%ld", value);
@@ -57,20 +53,6 @@ Token *create_token(Token *cur, TokenType type, const char *str, int line, int c
     token->col = col;
     cur->next = token;
     return token;
-}
-
-bool expect(char expected, char *ptr) {
-    if (*ptr == expected) {
-        return true;
-    }
-    return false;
-}
-
-bool expect_condition(bool (*condition)(char), char *ptr) {
-    if (condition(*ptr)) {
-        return true;
-    }
-    return false;
 }
 
 void readUntil(char *buffer, int max_len, const char *ptr, bool (*condition)(char)) {
@@ -150,12 +132,6 @@ Token *lexer(const char *ptr, Token **head, Token *cur, int line) {
         }
 
         if (isspace(*ptr)) {
-            col++;
-            ptr++;
-            continue;
-        }
-
-        if (isTab(*ptr)) {
             col++;
             ptr++;
             continue;

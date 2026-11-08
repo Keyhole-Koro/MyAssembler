@@ -39,14 +39,6 @@ const char* token_type_to_string(TokenType type) {
     }
 }
 
-
-void print_binary32(uint32_t value) {
-    for (int i = 31; i >= 0; --i) {
-        printf("%c", (value >> i) & 1 ? '1' : '0');
-        if (i % 4 == 0 && i != 0) printf(" "); // 4ビット区切り
-    }
-}
-
 static const char* mnemonic_from_opcode(uint8_t opcode) {
     for (size_t i = 0; i < instruction_count; ++i) {
         if (instruction_table[i].opcode == opcode) return instruction_table[i].name;
@@ -71,52 +63,6 @@ static const char* reg_name(uint8_t code) {
         case 0x0C: return "lr";
         default: return "r?";
     }
-}
-
-static __attribute__((unused)) void print_instruction_list(const AsmInstr *inst_list, int indent) {
-    for (const AsmInstr *n = inst_list; n; n = n->next) {
-        const Instruction *inst = n->instruction;
-        const char *mn = mnemonic_from_opcode(inst->base.opcode);
-        for (int i = 0; i < indent; ++i) putchar(' ');
-        printf("- %s ", mn);
-        switch (n->kind) {
-            case INSTR_REGREG:
-                printf("%s, %s", reg_name(inst->regreg.reg1), reg_name(inst->regreg.reg2));
-                break;
-            case INSTR_REGIMM21: {
-                int32_t imm = sign_extend_21bit(inst->regimm21.imm21 & 0x1FFFFF);
-                printf("%s, %d", reg_name(inst->regimm21.reg1), imm);
-                break;
-            }
-            case INSTR_REG:
-                printf("%s", reg_name(inst->reg.reg1));
-                break;
-            case INSTR_LABEL:
-                printf("%s", inst->label.label);
-                break;
-            case INSTR_IMM26: {
-                int32_t imm = sign_extend_26bit(inst->imm26.imm26 & 0x3FFFFFF);
-                printf("#%d", imm);
-                break;
-            }
-            case INSTR_NO_OPERAND:
-                // nothing
-                break;
-            case INSTR_REGLABEL:
-                printf("%s, %s", reg_name(inst->reglabel.reg1), inst->reglabel.label);
-                break;
-            default:
-                printf("<unknown kind>");
-                break;
-        }
-        if (n->needs_fixup) printf("  [fixup]");
-        printf("\n");
-    }
-}
-
-void print_label_instruction_lines(const AsmBlock *head) {
-    // Delegate to file-based implementation for consistency
-    fprint_label_instruction_lines(stdout, head);
 }
 
 static void fprint_instruction_list(FILE *out, const AsmInstr *inst_list, int indent) {
@@ -183,10 +129,6 @@ void fprint_tokens(FILE *out, const Token *tokens) {
     for (const Token *t = tokens; t != NULL; t = t->next) {
         fprintf(out, "Token: Type=%s, Str='%s'\n", token_type_to_string(t->type), t->str);
     }
-}
-
-void print_tokens(const Token *tokens) {
-    fprint_tokens(stdout, tokens);
 }
 
 void write_debug_report(const char *path, const Token *tokens, const AsmBlock *program) {
