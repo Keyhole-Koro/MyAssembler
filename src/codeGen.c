@@ -437,7 +437,8 @@ static void add_collect(CodeGen *cg, char *name, uint32_t offset, uint32_t size)
 
 // Put a block's label at `at` in the block's section, and in the symbol
 // table under its own name if it is public -- an `f_` function, __START__,
-// or exported -- or else under a name private to this object.
+// or exported -- or else under a name private to this object
+// (PRIVATE_LABEL_FORMAT in ObjectFormat.h, which the linker recognises).
 static void define_label(CodeGen *cg, const AsmBlock *block, uint32_t at) {
     mapLabelToAddress(&cg->labels, block->label, at);
     if (is_public_label(block->label) || is_exported(block->label, cg->exports, cg->export_count)) {
@@ -445,7 +446,7 @@ static void define_label(CodeGen *cg, const AsmBlock *block, uint32_t at) {
         symbolvec_push(&cg->symbols, block->label, SYMBOL_DEFINED, block->section, at);
     } else {
         char unique_name[96];
-        snprintf(unique_name, sizeof(unique_name), "%s-[%s:%u]", block->label, cg->module_name, cg->next_private++);
+        snprintf(unique_name, sizeof(unique_name), PRIVATE_LABEL_FORMAT, block->label, cg->module_name, cg->next_private++);
         labelsymbolmap_put(&cg->symbol_names, block->label, unique_name);
         symbolvec_push(&cg->symbols, unique_name, SYMBOL_DEFINED, block->section, at);
     }
