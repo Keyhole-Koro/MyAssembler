@@ -63,6 +63,20 @@ const InstructionDef instruction_table[] = {
 
 const size_t instruction_count = sizeof(instruction_table) / sizeof(instruction_table[0]);
 
+const char *const register_names[] = {
+    "r0", "r1", "r2", "r3", "r4", "r5", "r6", "r7",
+    "pc", "sp", "bp", "sr", "lr",
+};
+
+const size_t register_count = sizeof(register_names) / sizeof(register_names[0]);
+
+int register_number(const char *name) {
+    for (size_t i = 0; i < register_count; ++i) {
+        if (strcmp(name, register_names[i]) == 0) return (int)i;
+    }
+    return -1;
+}
+
 static int case_insensitive_equals(const char *a, const char *b) {
     if (!a || !b) return 0;
     while (*a && *b) {

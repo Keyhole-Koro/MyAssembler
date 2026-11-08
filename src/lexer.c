@@ -81,18 +81,12 @@ Token *instruction(Token *cur, const char *ptr, int line, int col) {
 
 //slow
 bool is_register(const char *reg, char *buffer) {
-    const char *registers[] = {
-        "r0", "r1", "r2", "r3", "r4", "r5", "r6", "r7",
-        "pc", "sp", "bp", "sr", "lr"
-    };
-    int count = sizeof(registers) / sizeof(registers[0]);
-
-    for (int i = 0; i < count; i++) {
-        size_t len = strlen(registers[i]);
-        if (strncmp(reg, registers[i], len) == 0) {
+    for (size_t i = 0; i < register_count; i++) {
+        size_t len = strlen(register_names[i]);
+        if (strncmp(reg, register_names[i], len) == 0) {
             char next = reg[len];
             if (next == '\0' || (!isalnum(next) && next != '_')) {
-                strncpy(buffer, registers[i], len + 1);
+                strncpy(buffer, register_names[i], len + 1);
                 return true;
             }
         }

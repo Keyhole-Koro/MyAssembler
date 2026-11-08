@@ -47,22 +47,7 @@ static const char* mnemonic_from_opcode(uint8_t opcode) {
 }
 
 static const char* reg_name(uint8_t code) {
-    switch (code) {
-        case 0x00: return "r0";
-        case 0x01: return "r1";
-        case 0x02: return "r2";
-        case 0x03: return "r3";
-        case 0x04: return "r4";
-        case 0x05: return "r5";
-        case 0x06: return "r6";
-        case 0x07: return "r7";
-        case 0x08: return "pc";
-        case 0x09: return "sp";
-        case 0x0A: return "bp";
-        case 0x0B: return "sr";
-        case 0x0C: return "lr";
-        default: return "r?";
-    }
+    return code < register_count ? register_names[code] : "r?";
 }
 
 static void fprint_instruction_list(FILE *out, const AsmInstr *inst_list, int indent) {

@@ -319,22 +319,12 @@ static inline uint8_t mapOpcode(const char *opcode) {
 }
 
 uint8_t mapRegister(const char *reg) {
-    if (strcmp(reg, "r0") == 0) return 0x00;
-    if (strcmp(reg, "r1") == 0) return 0x01;
-    if (strcmp(reg, "r2") == 0) return 0x02;
-    if (strcmp(reg, "r3") == 0) return 0x03;
-    if (strcmp(reg, "r4") == 0) return 0x04;
-    if (strcmp(reg, "r5") == 0) return 0x05;
-    if (strcmp(reg, "r6") == 0) return 0x06;
-    if (strcmp(reg, "r7") == 0) return 0x07;
-    if (strcmp(reg, "pc") == 0) return 0x08;
-    if (strcmp(reg, "sp") == 0) return 0x09;
-    if (strcmp(reg, "bp") == 0) return 0x0A;
-    if (strcmp(reg, "sr") == 0) return 0x0B;
-    if (strcmp(reg, "lr") == 0) return 0x0C;
-
-    fprintf(stderr, "Unknown register: %s\n", reg);
-    exit(EXIT_FAILURE);
+    int number = register_number(reg);
+    if (number < 0) {
+        fprintf(stderr, "Unknown register: %s\n", reg);
+        exit(EXIT_FAILURE);
+    }
+    return (uint8_t)number;
 }
 
 
