@@ -190,6 +190,70 @@ void test_label_on_last_line_without_newline(void) {
     free(mc.code);
 }
 
+typedef struct {
+    TokenType type;
+    const char *text;
+} ExpectedToken;
+
+// `line`'s tokens must be `expected`, and no more.
+static void assert_tokens(const char *line, const ExpectedToken *expected, size_t count) {
+    Token *head = NULL;
+    lexer(line, &head, NULL, 1);
+    Token *token = head->next; // the head is an empty token
+    for (size_t i = 0; i < count; i++, token = token->next) {
+        TEST_ASSERT_NOT_NULL(token);
+        TEST_ASSERT_EQUAL_INT(expected[i].type, token->type);
+        TEST_ASSERT_EQUAL_STRING(expected[i].text, token->str);
+    }
+    TEST_ASSERT_NULL(token);
+}
+
+#define ASSERT_TOKENS(line, ...)                                               \
+    do {                                                                       \
+        const ExpectedToken expected[] = {__VA_ARGS__};                        \
+        assert_tokens(line, expected, sizeof(expected) / sizeof(expected[0])); \
+    } while (0)
+
+// A negative number ends at its last digit: whatever follows is lexed as it
+// would be after any other token, and the end of the line is the end.
+void test_negative_number_ends_at_its_last_digit(void) {
+    ASSERT_TOKENS("-1,x\n", {NEGATIVE_NUMBER, "-1"}, {COMMA, ","}, {LABEL, "x"}, {NEWLINE, "\n"});
+    ASSERT_TOKENS("-1;comment\n", {NEGATIVE_NUMBER, "-1"}, {NEWLINE, "\n"});
+    // The token is the value, shorter than the text it was read from.
+    ASSERT_TOKENS("-007,8", {NEGATIVE_NUMBER, "-7"}, {COMMA, ","}, {NUMBER, "8"});
+    // Nothing after the line's terminator is read.
+    static const char last_line[] = "-1\0, 2";
+    ASSERT_TOKENS(last_line, {NEGATIVE_NUMBER, "-1"});
+}
+
+// A negative number as an immediate and in `.word` and `.byte` lists, each
+// followed straight away by a comment or a comma.
+void test_negative_numbers_in_operands_and_lists(void) {
+    MachineCode mc = assemble_source("negativeNumbers",
+                                     "__START__:\n"
+                                     "  movi r1, -1;a comment\n"
+                                     "  halt\n"
+                                     "words:\n"
+                                     "  .word -1, words, -010,3\n"
+                                     "bytes:\n"
+                                     "  .byte -1,-2, 3\n");
+    const uint8_t expected[] = {
+        0x08, 0x3F, 0xFF, 0xFF, // movi r1, -1: the immediate is 21 bits
+        0xFC, 0x00, 0x00, 0x00, // halt
+        0xFF, 0xFF, 0xFF, 0xFF, // -1
+        0x00, 0x00, 0x00, 0x00, // words, for the linker to fill in
+        0xFF, 0xFF, 0xFF, 0xF6, // -010 is -10: the digits after a sign are decimal
+        0x00, 0x00, 0x00, 0x03,
+        0xFF, 0xFE, 0x03, 0x00, // -1, -2, 3, then padding to a word
+    };
+    TEST_ASSERT_EQUAL_size_t(sizeof(expected), mc.size);
+    TEST_ASSERT_EQUAL_HEX8_ARRAY(expected, mc.code, sizeof(expected));
+    TEST_ASSERT_EQUAL_size_t(1, mc.reloc_count);
+    TEST_ASSERT_EQUAL_UINT32(RELOC_WORD32, mc.relocs[0].type);
+    TEST_ASSERT_EQUAL_UINT32(12, mc.relocs[0].offset);
+    free(mc.code);
+}
+
 static unsigned char *read_whole_file(const char *path, size_t *size) {
     FILE *file = fopen(path, "rb");
     if (!file) return NULL;
@@ -231,5 +295,7 @@ int main(void) {
     RUN_TEST(test_dependency_file_uses_import_from_path);
     RUN_TEST(test_object_matches_golden);
     RUN_TEST(test_label_on_last_line_without_newline);
+    RUN_TEST(test_negative_number_ends_at_its_last_digit);
+    RUN_TEST(test_negative_numbers_in_operands_and_lists);
     return UNITY_END();
 }

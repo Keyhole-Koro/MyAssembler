@@ -221,11 +221,15 @@ Token *lexer(const char *ptr, Token **head, Token *cur, int line) {
 
         if (*ptr == '-' && is_number(*(ptr + 1))) {
             readUntil(buffer, MAX_TOKEN_LEN, ptr + 1, is_number);
+            // The token is the value written back (`-007` is "-7"), so the
+            // text it came from is the sign and the digits read, not the
+            // token's length.
+            int length = 1 + (int)strlen(buffer);
             long value = strtol(buffer, NULL, 10);  // Convert string to integer
             snprintf(buffer, MAX_TOKEN_LEN, "-%ld", value);  // Add negative sign
             cur = create_token(cur, NEGATIVE_NUMBER, buffer, tok_line, tok_col);
-            ptr += strlen(buffer) + 1;  // Move past the number
-            col += (int)strlen(buffer) + 1;
+            ptr += length;
+            col += length;
             continue;
         }
 
