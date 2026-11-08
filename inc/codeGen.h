@@ -8,18 +8,20 @@
 #include "lexer.h"
 #include "utils.h"
 
+// ObjectFormat.h's SymbolEntry, RelocEntry and CollectEntry, with the names
+// not yet cut to their 64-byte fields.
 typedef struct {
     char *name;
-    uint32_t type;    // 0=UNDEFINED, 1=DEFINED
-    uint32_t section; // 0=TEXT, 1=DATA
+    uint32_t type;    // ObjSymbolType
+    uint32_t section; // ObjSection
     uint32_t offset;
 } ObjSymbol;
 
 typedef struct {
     uint32_t offset;      // offset to patch within `section`
     char *symbol_name;    // target symbol
-    uint32_t type;        // 0=ABSOLUTE, 1=RELATIVE, 2=WORD32
-    uint32_t section;     // 0=TEXT, 1=DATA, 2=COLLECT blob
+    uint32_t type;        // ObjRelocType
+    uint32_t section;     // ObjSection
 } ObjReloc;
 
 typedef struct {

@@ -11,6 +11,7 @@
 #include <assert.h>
 #include <errno.h>
 
+#include "ObjectFormat.h"
 #include "lexer.h"
 #include "utils.h"
 
@@ -150,12 +151,12 @@ struct AsmBlock {
     // Word payload (from .word), laid out after the padded bytes
     AsmWord *words;
     size_t word_count;
-    // Named collected section this block's payload belongs to (from a
-    // preceding `.section name`), or NULL for ordinary text/data.
-    char *section;
-    // 1: the block is in the DATA section (`.data` ... `.text`): writable
-    // storage the loader maps separately from code. Data only.
-    int in_data;
+    // The object section the block goes to: TEXT; DATA between `.data` and
+    // `.text` (writable storage the loader maps separately from code); or
+    // COLLECT after `.section name`, a chunk of the collected section named
+    // `section_name`. DATA and COLLECT blocks hold data only.
+    enum ObjSection section;
+    char *section_name; // COLLECT only
     AsmMark *marks;
     size_t mark_count;
     AsmBlock *next; // Pointer to the next labeled block

@@ -539,8 +539,8 @@ AsmBlock *label(Token **cur) {
     label_inst_line->data_count = 0;
     label_inst_line->words = NULL;
     label_inst_line->word_count = 0;
-    label_inst_line->section = NULL;
-    label_inst_line->in_data = 0;
+    label_inst_line->section = SECTION_TEXT;
+    label_inst_line->section_name = NULL;
     label_inst_line->next = NULL; // Initialize the next pointer to NULL
     
     AsmInstr *cur_inst = label_inst_line->inst_list;
@@ -633,8 +633,8 @@ AsmBlock *parser(Token *head) {
 
         if (is_label_declaration(*cur)) {
             new_label = label(cur);
-            new_label->section = pending_section;
-            new_label->in_data = pending_section ? 0 : in_data;
+            new_label->section = pending_section ? SECTION_COLLECT : in_data ? SECTION_DATA : SECTION_TEXT;
+            new_label->section_name = pending_section;
             pending_section = NULL;
         /*
         } else if ((*cur)->type == INSTRUCTION) {
