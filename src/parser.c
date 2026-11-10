@@ -4,6 +4,8 @@
 #define ERROR(cur, msg, ...) \
     error_with_context(cur, msg, ##__VA_ARGS__)
 
+static AsmInstr *instrRegLabel(uint8_t opcode, Token *reg1, const char *label);
+
 static const char *g_src_file = NULL;
 void parser_set_source_file(const char *path) { g_src_file = path; }
 
@@ -13,6 +15,8 @@ static char **g_import_paths = NULL;
 static size_t g_import_path_count = 0;
 static char **g_exports = NULL;
 static size_t g_export_count = 0;
+static char **g_shares = NULL;
+static size_t g_share_count = 0;
 
 static void reset_symbols(void) {
     if (g_imports) {
@@ -33,6 +37,12 @@ static void reset_symbols(void) {
     }
     g_exports = NULL;
     g_export_count = 0;
+    if (g_shares) {
+        for (size_t i = 0; i < g_share_count; i++) free(g_shares[i]);
+        free(g_shares);
+    }
+    g_shares = NULL;
+    g_share_count = 0;
 }
 
 static void add_symbol_name(char ***items, size_t *count, const char *name, const char *what) {
@@ -73,6 +83,11 @@ const char **parser_get_import_paths(size_t *count) {
 const char **parser_get_exports(size_t *count) {
     if (count) *count = g_export_count;
     return (const char **)g_exports;
+}
+
+const char **parser_get_shares(size_t *count) {
+    if (count) *count = g_share_count;
+    return (const char **)g_shares;
 }
 
 static int is_symbol_token(Token *tok) {
@@ -313,6 +328,27 @@ static void parse_export(Token **cur) {
     if (*cur && (*cur)->type == NEWLINE) { consume(cur); }
 }
 
+// `.shared foo[, bar...]`: labels private to the source module that other
+// objects may still name while no other object shares the name -- a test
+// harness calling a test function, a mock calling the original (SYMBOL_SHARED).
+static void parse_shared(Token **cur) {
+    consume(cur); // '.'
+    consume(cur); // 'shared'
+    if (!is_symbol_token(*cur)) {
+        ERROR(*cur, "Expected symbol name after .shared");
+    }
+    while (is_symbol_token(*cur)) {
+        add_symbol_name(&g_shares, &g_share_count, (*cur)->str, "shared name");
+        consume(cur);
+        if (*cur && (*cur)->type == COMMA) {
+            consume(cur);
+            continue;
+        }
+        break;
+    }
+    if (*cur && (*cur)->type == NEWLINE) { consume(cur); }
+}
+
 // central opcode lookup
 static inline uint8_t mapOpcode(const char *opcode) {
     return opcode_from_mnemonic(opcode);
@@ -434,24 +470,18 @@ AsmInstr *instrRegAppears(Token **cur, Token *opcode, Token *reg1) {
             consume(cur);
             return instrRegImm21(opcode, reg1, imm21);
         } else if (is_symbol_token(*cur) && !is_label_declaration(*cur)) {
-            // reg, label -> treat as immediate fixup for label address
-            AsmInstr *instrList = malloc(sizeof(AsmInstr));
-            InstrRegLabel *rl = malloc(sizeof(InstrRegLabel));
-            instrList->kind = INSTR_REGLABEL;
-            // For "mov reg, label" treat it as an address load using MOVI so the
-            // emulator decodes it with an immediate instead of a second register.
-            if (strcmp(opcode->str, "mov") == 0 || strcmp(opcode->str, "MOV") == 0) {
-                rl->opcode = opcode_from_mnemonic("movi");
-            } else {
-                rl->opcode = mapOpcode(opcode->str);
-            }
-            rl->reg1 = mapRegister(reg1->str);
-            rl->label = (*cur)->str;
-            instrList->instruction = (Instruction *)rl;
-            instrList->needs_fixup = true; // Fixup needed when resolving label address
-            instrList->next = NULL;
+            // reg, label: load the label's address. An address takes 32 bits
+            // and an immediate 21, so `movi rX, label` (or `mov`) becomes two
+            // instructions, LUI with bits 31..11 and ADDIS with bits 10..0,
+            // which the linker fills in (RELOC_HI21, RELOC_LO11).
+            uint8_t op = mapOpcode(opcode->str);
+            bool address_load = op == opcode_from_mnemonic("movi") || op == opcode_from_mnemonic("mov");
+            const char *label = (*cur)->str;
             consume(cur);
-            return instrList;
+            if (!address_load) return instrRegLabel(op, reg1, label);
+            AsmInstr *upper = instrRegLabel(opcode_from_mnemonic("lui"), reg1, label);
+            upper->next = instrRegLabel(opcode_from_mnemonic("addis"), reg1, label);
+            return upper;
         
         } else {
             ERROR(*cur, "Expected REGISTER or NUMBER after COMMA but found: %s\n",
@@ -461,6 +491,19 @@ AsmInstr *instrRegAppears(Token **cur, Token *opcode, Token *reg1) {
     } else {
         return instrReg(opcode, reg1);
     }
+}
+
+static AsmInstr *instrRegLabel(uint8_t opcode, Token *reg1, const char *label) {
+    AsmInstr *instrList = malloc(sizeof(AsmInstr));
+    InstrRegLabel *rl = malloc(sizeof(InstrRegLabel));
+    instrList->kind = INSTR_REGLABEL;
+    rl->opcode = opcode;
+    rl->reg1 = mapRegister(reg1->str);
+    rl->label = (char *)label;
+    instrList->instruction = (Instruction *)rl;
+    instrList->needs_fixup = true; // the linker writes the label's address
+    instrList->next = NULL;
+    return instrList;
 }
 
 AsmInstr *instrLabel(Token *opcode, Token *label) {
@@ -542,14 +585,18 @@ AsmBlock *label(Token **cur) {
         while (*cur) {
             if (is_label_declaration(*cur)) { break; }
             if ((*cur)->type == INSTRUCTION) {
+                // One line can be more than one instruction (an address load).
                 AsmInstr *new_inst = instructions(cur);
-                label_inst_line->num_instrucitons++;
                 if (label_inst_line->inst_list == NULL) {
                     label_inst_line->inst_list = new_inst;
-                    cur_inst = new_inst;
                 } else {
                     cur_inst->next = new_inst;
-                    cur_inst = new_inst;
+                }
+                cur_inst = new_inst;
+                label_inst_line->num_instrucitons++;
+                while (cur_inst->next) {
+                    cur_inst = cur_inst->next;
+                    label_inst_line->num_instrucitons++;
                 }
                 continue;
             }
@@ -595,6 +642,11 @@ AsmBlock *parser(Token *head) {
         }
         if ((*cur)->type == EXPORT) {
             parse_export(cur);
+            continue;
+        }
+        if ((*cur)->type == PERIOD && (*cur)->next && (*cur)->next->type == LABEL &&
+            strcmp((*cur)->next->str, "shared") == 0) {
+            parse_shared(cur);
             continue;
         }
         // `.section name`: the next label block's data is one chunk of the

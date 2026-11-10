@@ -12,6 +12,7 @@ const InstructionDef instruction_table[] = {
     {"mov",   0x01},
     {"movi",  0x02},
     {"movis", 0x18},
+    {"lui",   0x25},
     {"load",  0x03},
     {"store", 0x04},
     {"loadb", 0x1C},

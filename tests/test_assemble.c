@@ -227,6 +227,30 @@ void test_label_on_last_line_without_newline(void) {
     free(mc.code);
 }
 
+// A shared label is private to its object, which refers to it by its private
+// name; it is also in the table under its own name, as SYMBOL_SHARED, for
+// another object to name (a test harness calling a test function).
+void test_shared_label_is_private_and_named(void) {
+    MachineCode mc = assemble_source("sharedLabel",
+        ".shared helper\n__START__:\n  movi r1, helper\n  halt\nhelper:\n  halt\n");
+    const ObjSymbol *shared = NULL;
+    const ObjSymbol *private_name = NULL;
+    for (size_t i = 0; i < mc.symbol_count; i++) {
+        if (strcmp(mc.symbols[i].name, "helper") == 0) shared = &mc.symbols[i];
+        else if (strncmp(mc.symbols[i].name, "helper" PRIVATE_LABEL_MARK, 8) == 0) private_name = &mc.symbols[i];
+    }
+    TEST_ASSERT_NOT_NULL(shared);
+    TEST_ASSERT_NOT_NULL(private_name);
+    TEST_ASSERT_EQUAL_UINT32(SYMBOL_SHARED, shared->type);
+    TEST_ASSERT_EQUAL_UINT32(SYMBOL_DEFINED, private_name->type);
+    TEST_ASSERT_EQUAL_UINT32(12, shared->offset);
+    TEST_ASSERT_EQUAL_UINT32(12, private_name->offset);
+    // Its own address load names it privately.
+    TEST_ASSERT_EQUAL_size_t(2, mc.reloc_count);
+    TEST_ASSERT_EQUAL_STRING(private_name->name, mc.relocs[0].symbol_name);
+    free(mc.code);
+}
+
 // A label operand may be the file's last token too.
 void test_operand_on_last_line_without_newline(void) {
     MachineCode jump = assemble_source("jumpAtEnd", "__START__:\n  jmp __START__");
@@ -235,12 +259,19 @@ void test_operand_on_last_line_without_newline(void) {
     TEST_ASSERT_EQUAL_HEX8_ARRAY(jump_code, jump.code, sizeof(jump_code));
     free(jump.code);
 
+    // An address load is two instructions, each relocated with half the address.
     MachineCode load = assemble_source("loadAtEnd", "__START__:\n  movi r1, __START__");
-    const uint8_t load_code[] = {0x08, 0x20, 0x00, 0x00}; // movi r1, 0, relocated
+    const uint8_t load_code[] = {
+        0x94, 0x20, 0x00, 0x00, // lui r1, 0: bits 31..11
+        0x64, 0x20, 0x00, 0x00, // addis r1, 0: bits 10..0
+    };
     TEST_ASSERT_EQUAL_size_t(sizeof(load_code), load.size);
     TEST_ASSERT_EQUAL_HEX8_ARRAY(load_code, load.code, sizeof(load_code));
-    TEST_ASSERT_EQUAL_size_t(1, load.reloc_count);
-    TEST_ASSERT_EQUAL_UINT32(RELOC_ABSOLUTE, load.relocs[0].type);
+    TEST_ASSERT_EQUAL_size_t(2, load.reloc_count);
+    TEST_ASSERT_EQUAL_UINT32(RELOC_HI21, load.relocs[0].type);
+    TEST_ASSERT_EQUAL_UINT32(0, load.relocs[0].offset);
+    TEST_ASSERT_EQUAL_UINT32(RELOC_LO11, load.relocs[1].type);
+    TEST_ASSERT_EQUAL_UINT32(4, load.relocs[1].offset);
     free(load.code);
 }
 
@@ -356,6 +387,7 @@ int main(void) {
     RUN_TEST(test_object_matches_golden);
     RUN_TEST(test_label_on_last_line_without_newline);
     RUN_TEST(test_operand_on_last_line_without_newline);
+    RUN_TEST(test_shared_label_is_private_and_named);
     RUN_TEST(test_missing_operand_at_end_of_file_is_an_error);
     RUN_TEST(test_negative_number_ends_at_its_last_digit);
     RUN_TEST(test_negative_numbers_in_operands_and_lists);

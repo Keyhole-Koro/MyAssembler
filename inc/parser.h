@@ -19,6 +19,7 @@ void parser_set_source_file(const char *path);
 const char **parser_get_imports(size_t *count);
 const char **parser_get_import_paths(size_t *count);
 const char **parser_get_exports(size_t *count);
+const char **parser_get_shares(size_t *count);
 
 // Base instruction containing only opcode (6 bits in lower bits)
 typedef struct {

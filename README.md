@@ -29,6 +29,21 @@ when updating instruction sets
 check `lexer` `parser`
 id integrate them for maintainabililty later
 
+## Addresses
+
+`movi rX, label` (or `mov rX, label`) loads the label's address. An address
+is 32 bits and an immediate 21, so it assembles to two instructions: `lui rX`
+with bits 31..11 and `addis rX` with bits 10..0, relocated `RELOC_HI21` and
+`RELOC_LO11` for the linker to fill in. A number keeps one `movi`.
+
+## Module-private labels
+
+`.shared name` marks a label private to its source module, as MyLangCompiler
+writes a function that is not exported. The object refers to it by its private
+label (`name-[module:n]`), so two objects may each have one; it is also in the
+symbol table under its own name as `SYMBOL_SHARED`, which another object may
+name while no other object defines or shares it.
+
 ## Data directives
 
 ```asm

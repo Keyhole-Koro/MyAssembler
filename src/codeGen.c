@@ -1,4 +1,5 @@
 #include "codeGen.h"
+#include "instructions.h"
 
 #include <stdint.h>
 #include <stdio.h>
@@ -280,11 +281,18 @@ uint32_t encodeInstruction(LabelMap *map, AsmInstr *inst_list, uint32_t currentP
                 // unresolved; caller will handle (placeholder)
                 return ENCODE(inst->reglabel.opcode, 26) | ENCODE(inst->reglabel.reg1, 21);
             }
-            if (addr >= (1u << 21)) {
+            // The linker rewrites these with the final address (see
+            // reglabel_reloc); this is the offset within the object.
+            uint32_t imm = addr;
+            if (inst->reglabel.opcode == opcode_from_mnemonic("lui")) {
+                imm = addr >> 11;
+            } else if (inst->reglabel.opcode == opcode_from_mnemonic("addis")) {
+                imm = addr & 0x7FF;
+            } else if (addr >= (1u << 21)) {
                 fprintf(stderr, "Error: Address 0x%X exceeds 21-bit immediate range for reg,label\n", addr);
                 exit(EXIT_FAILURE);
             }
-            InstrRegImm21 tmp = { .opcode = inst->reglabel.opcode, .reg1 = inst->reglabel.reg1, .imm21 = addr & 0x1FFFFF };
+            InstrRegImm21 tmp = { .opcode = inst->reglabel.opcode, .reg1 = inst->reglabel.reg1, .imm21 = imm & 0x1FFFFF };
             return encodeRegImm21(tmp);
         }
         case INSTR_NO_OPERAND:
@@ -366,6 +374,8 @@ typedef struct {
     size_t import_count;
     const char **exports;
     size_t export_count;
+    const char **shares;
+    size_t share_count;
     char module_name[32];          // tags this object's private labels
     uint32_t next_private;         // number of the next private label
     LabelMap labels;               // label -> offset in its block's section
@@ -449,6 +459,10 @@ static void define_label(CodeGen *cg, const AsmBlock *block, uint32_t at) {
         snprintf(unique_name, sizeof(unique_name), PRIVATE_LABEL_FORMAT, block->label, cg->module_name, cg->next_private++);
         labelsymbolmap_put(&cg->symbol_names, block->label, unique_name);
         symbolvec_push(&cg->symbols, unique_name, SYMBOL_DEFINED, block->section, at);
+        // A shared label is also there under its own name, for other objects.
+        if (is_exported(block->label, cg->shares, cg->share_count)) {
+            symbolvec_push(&cg->symbols, block->label, SYMBOL_SHARED, block->section, at);
+        }
     }
 }
 
@@ -478,6 +492,12 @@ static void check_exports(CodeGen *cg) {
             exit(EXIT_FAILURE);
         }
     }
+    for (size_t i = 0; i < cg->share_count; i++) {
+        if (!label_defined(cg, cg->shares[i])) {
+            fprintf(stderr, "Shared symbol '%s' is not defined in this file\n", cg->shares[i]);
+            exit(EXIT_FAILURE);
+        }
+    }
 }
 
 // Imports go in the symbol table as undefined, once each. An import has no
@@ -498,10 +518,19 @@ static uint8_t *alloc_section(uint32_t size, const char *failure) {
     return bytes;
 }
 
+// The relocation that puts a symbol's address into a `reg, label`
+// instruction: the halves of the LUI and ADDIS pair `movi rX, label` becomes
+// (see the parser), or a 21-bit MOVI immediate.
+static uint32_t reglabel_reloc(uint8_t opcode) {
+    if (opcode == opcode_from_mnemonic("lui")) return RELOC_HI21;
+    if (opcode == opcode_from_mnemonic("addis")) return RELOC_LO11;
+    return RELOC_ABSOLUTE;
+}
+
 // Encode the instruction at `pc`. A label operand this file defines is
-// resolved here: a jump's offset, or MOVI's address, which also gets an
-// ABSOLUTE relocation because the linker moves the text. For an imported
-// label the field is left 0 and the relocation says what goes there.
+// resolved here: a jump's offset, or an address, which also gets a
+// relocation because the linker moves the text. For an imported label the
+// field is left 0 and the relocation says what goes there.
 static uint32_t encode_at(CodeGen *cg, AsmInstr *inst, uint32_t pc) {
     if (inst->needs_fixup && inst->kind == INSTR_LABEL) {
         InstrLabel jump = inst->instruction->label;
@@ -514,7 +543,8 @@ static uint32_t encode_at(CodeGen *cg, AsmInstr *inst, uint32_t pc) {
         const char *label = inst->instruction->reglabel.label;
         require_symbol(cg, label, "");
         uint32_t encoded = encodeInstruction(&cg->labels, inst, pc);
-        relocvec_push(&cg->relocs, pc, symbol_name(cg, label), RELOC_ABSOLUTE, SECTION_TEXT);
+        relocvec_push(&cg->relocs, pc, symbol_name(cg, label),
+                      reglabel_reloc(inst->instruction->reglabel.opcode), SECTION_TEXT);
         return encoded;
     }
     return encodeInstruction(&cg->labels, inst, pc);
@@ -553,12 +583,14 @@ static void emit_blocks(CodeGen *cg, AsmBlock *head, uint8_t *out[SECTION_COUNT]
     }
 }
 
-MachineCode codeGen(AsmBlock *head, const char **imports, size_t import_count, const char **exports, size_t export_count, const char *module_tag) {
+MachineCode codeGen(AsmBlock *head, const char **imports, size_t import_count, const char **exports, size_t export_count, const char **shares, size_t share_count, const char *module_tag) {
     CodeGen cg = {0};
     cg.imports = imports;
     cg.import_count = import_count;
     cg.exports = exports;
     cg.export_count = export_count;
+    cg.shares = shares;
+    cg.share_count = share_count;
     cg.next_private = 1;
     initLabelMap(&cg.labels);
     initLabelSymbolMap(&cg.symbol_names);

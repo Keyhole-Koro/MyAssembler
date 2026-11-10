@@ -53,7 +53,9 @@ MachineCode assembler(const char *file_path, const char *output_path) {
     const char **imports = parser_get_imports(&import_count);
     size_t export_count = 0;
     const char **exports = parser_get_exports(&export_count);
-    return codeGen(parsed, imports, import_count, exports, export_count, file_path);
+    size_t share_count = 0;
+    const char **shares = parser_get_shares(&share_count);
+    return codeGen(parsed, imports, import_count, exports, export_count, shares, share_count, file_path);
 }
 
 typedef struct SourceDependency {
