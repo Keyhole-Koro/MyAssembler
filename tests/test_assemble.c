@@ -476,6 +476,51 @@ void test_immediates_at_the_ends_of_their_range(void) {
     free(mc.code);
 }
 
+// `text` followed by `count` copies of `repeat`, then `tail`, in a new string.
+static char *repeated(const char *text, const char *repeat, size_t count, const char *tail) {
+    size_t length = strlen(text) + strlen(repeat) * count + strlen(tail);
+    char *source = malloc(length + 1);
+    TEST_ASSERT_NOT_NULL(source);
+    char *at = stpcpy(source, text);
+    for (size_t i = 0; i < count; i++) at = stpcpy(at, repeat);
+    strcpy(at, tail);
+    return source;
+}
+
+// A line is read whole, however long: a comment runs to the end of its
+// line, and the next line is the line after.
+void test_long_comment_line(void) {
+    char *source = repeated("; ", "x", 9000, "\n__START__:\n  halt\n");
+    MachineCode mc = assemble_source("longCommentLine", source);
+    const uint8_t halt[] = {0xFC, 0x00, 0x00, 0x00};
+    TEST_ASSERT_EQUAL_size_t(sizeof(halt), mc.size);
+    TEST_ASSERT_EQUAL_HEX8_ARRAY(halt, mc.code, sizeof(halt));
+    free(mc.code);
+    free(source);
+}
+
+// A number at byte 8189..8191 of a `.byte` line -- where an 8192-byte line
+// buffer used to split the line -- is one number.
+void test_long_byte_line(void) {
+    char *source = repeated("__START__:\n  halt\ndata:\n  .byte  ", "1,", 4090, "123,7\n");
+    MachineCode mc = assemble_source("longByteLine", source);
+    TEST_ASSERT_EQUAL_size_t(4 + 4092, mc.size);
+    for (size_t i = 4; i < 4 + 4090; i++) TEST_ASSERT_EQUAL_HEX8(1, mc.code[i]);
+    TEST_ASSERT_EQUAL_HEX8(123, mc.code[4 + 4090]);
+    TEST_ASSERT_EQUAL_HEX8(7, mc.code[4 + 4091]);
+    free(mc.code);
+    free(source);
+}
+
+// An error after a long line is reported at its own line, and shows it.
+void test_error_after_long_line_names_its_line(void) {
+    char *source = repeated("; ", "x", 9000, "\n__START__:\n  movi r1, 0x200000\n");
+    assert_rejected("errorAfterLongLine", source,
+                    ":3:12: error: Immediate 2097152 is out of range (-1048576..2097151)\n"
+                    "    movi r1, 0x200000\n");
+    free(source);
+}
+
 // A byte outside ASCII (UTF-8 text) may sit in a comment or a string, and
 // is an error anywhere else.
 void test_non_ascii_bytes_only_in_comments_and_strings(void) {
@@ -507,5 +552,8 @@ int main(void) {
     RUN_TEST(test_long_private_labels_keep_distinct_names);
     RUN_TEST(test_out_of_range_immediates_are_rejected);
     RUN_TEST(test_immediates_at_the_ends_of_their_range);
+    RUN_TEST(test_long_comment_line);
+    RUN_TEST(test_long_byte_line);
+    RUN_TEST(test_error_after_long_line_names_its_line);
     return UNITY_END();
 }

@@ -102,9 +102,12 @@ static void print_line_snippet(const char *file, int line, int col) {
     if (!file || line <= 0) return;
     FILE *fp = fopen(file, "r");
     if (!fp) return;
-    char buf[512];
+    // Read each line whole, as the lexer does, so that a long line counts
+    // as one.
+    char *buf = NULL;
+    size_t capacity = 0;
     int cur_line = 1;
-    while (fgets(buf, sizeof(buf), fp)) {
+    while (getline(&buf, &capacity, fp) != -1) {
         if (cur_line == line) {
             size_t len = strlen(buf);
             while (len > 0 && (buf[len-1] == '\n' || buf[len-1] == '\r')) buf[--len] = '\0';
@@ -114,6 +117,7 @@ static void print_line_snippet(const char *file, int line, int col) {
         }
         cur_line++;
     }
+    free(buf);
     fclose(fp);
 }
 

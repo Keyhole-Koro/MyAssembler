@@ -15,18 +15,20 @@ Token *_lexer(const char *file_path) {
     }
 
     // Generated `.byte` lines for string literals run ~6 chars per byte, so a
-    // long UI string easily exceeds a small line buffer. A too-short buffer
-    // splits a line mid-token and corrupts the stream, so keep this generous.
-    char buffer[8192];
+    // long UI string makes a long line. Each line is read whole, however
+    // long: a line read in pieces would be split mid-token.
+    char *buffer = NULL;
+    size_t capacity = 0;
     Token *head = NULL;
     Token *cur = NULL;
 
     int line = 1;
-    while (fgets(buffer, sizeof(buffer), file)) {
+    while (getline(&buffer, &capacity, file) != -1) {
         cur = lexer(buffer, &head, cur, line);
         line++;
     }
 
+    free(buffer);
     fclose(file);
 
     return head;
