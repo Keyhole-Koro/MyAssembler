@@ -380,6 +380,68 @@ void test_object_matches_golden(void) {
     free(mc.code);
 }
 
+// Two private labels too long for the object's names, alike in their first
+// 70 bytes, keep names of their own there: each is cut short to leave room
+// for the `-[module:n]` that makes it private and unique, and each address
+// load is relocated against its own label.
+void test_long_private_labels_keep_distinct_names(void) {
+    char prefix[71];
+    memset(prefix, 'a', 70);
+    prefix[70] = '\0';
+    char source[1024];
+    snprintf(source, sizeof(source),
+             "__START__:\n"
+             "  movi r1, %s_one\n"
+             "  movi r2, %s_two\n"
+             "  halt\n"
+             "%s_one:\n"
+             "  halt\n"
+             "%s_two:\n"
+             "  halt\n",
+             prefix, prefix, prefix, prefix);
+    MachineCode mc = assemble_source("longPrivateLabels", source);
+
+    const ObjSymbol *one = NULL;
+    const ObjSymbol *two = NULL;
+    for (size_t i = 0; i < mc.symbol_count; i++) {
+        if (mc.symbols[i].offset == 20) one = &mc.symbols[i];
+        if (mc.symbols[i].offset == 24) two = &mc.symbols[i];
+    }
+    TEST_ASSERT_NOT_NULL(one);
+    TEST_ASSERT_NOT_NULL(two);
+    TEST_ASSERT_TRUE(strcmp(one->name, two->name) != 0);
+    TEST_ASSERT_NOT_NULL(strstr(one->name, PRIVATE_LABEL_MARK));
+    TEST_ASSERT_NOT_NULL(strstr(two->name, PRIVATE_LABEL_MARK));
+    TEST_ASSERT_TRUE(strlen(one->name) < sizeof(((struct SymbolEntry *)0)->name));
+    TEST_ASSERT_TRUE(strlen(two->name) < sizeof(((struct SymbolEntry *)0)->name));
+
+    TEST_ASSERT_EQUAL_size_t(4, mc.reloc_count);
+    TEST_ASSERT_EQUAL_STRING(one->name, mc.relocs[0].symbol_name);
+    TEST_ASSERT_EQUAL_STRING(one->name, mc.relocs[1].symbol_name);
+    TEST_ASSERT_EQUAL_STRING(two->name, mc.relocs[2].symbol_name);
+    TEST_ASSERT_EQUAL_STRING(two->name, mc.relocs[3].symbol_name);
+
+    // The object holds the names whole.
+    ensure_output_dir();
+    write_object("tests/outputs/longPrivateLabels.mobj", &mc);
+    size_t size = 0;
+    unsigned char *object = read_whole_file("tests/outputs/longPrivateLabels.mobj", &size);
+    TEST_ASSERT_NOT_NULL(object);
+    struct FileHeader header;
+    TEST_ASSERT_TRUE(size >= sizeof(header));
+    memcpy(&header, object, sizeof(header));
+    size_t at = sizeof(header) + header.text_size + header.data_size + header.collect_size;
+    TEST_ASSERT_EQUAL_UINT32(mc.symbol_count, header.symtable_count);
+    TEST_ASSERT_TRUE(size >= at + header.symtable_count * sizeof(struct SymbolEntry));
+    for (size_t i = 0; i < header.symtable_count; i++) {
+        struct SymbolEntry entry;
+        memcpy(&entry, object + at + i * sizeof(entry), sizeof(entry));
+        TEST_ASSERT_EQUAL_STRING(mc.symbols[i].name, entry.name);
+    }
+    free(object);
+    free(mc.code);
+}
+
 // A byte outside ASCII (UTF-8 text) may sit in a comment or a string, and
 // is an error anywhere else.
 void test_non_ascii_bytes_only_in_comments_and_strings(void) {
@@ -408,5 +470,6 @@ int main(void) {
     RUN_TEST(test_negative_number_ends_at_its_last_digit);
     RUN_TEST(test_negative_numbers_in_operands_and_lists);
     RUN_TEST(test_non_ascii_bytes_only_in_comments_and_strings);
+    RUN_TEST(test_long_private_labels_keep_distinct_names);
     return UNITY_END();
 }
