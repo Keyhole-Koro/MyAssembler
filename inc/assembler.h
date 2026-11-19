@@ -6,9 +6,9 @@
 #include "codeGen.h"
 #include "utils.h"
 
-// Assemble input file. Use output_path (binary path) to place debug report
-// alongside it, named with the input file's stem, suffixed with "_asm.txt".
-MachineCode assembler(const char *file_path, const char *output_path);
+// Assemble input file. With a report_path, also write the debug report there:
+// the tokens and the parsed lines. NULL writes none.
+MachineCode assembler(const char *file_path, const char *report_path);
 
 // Optional: write a MyCCLinker-compatible .obj file from assembled output.
 void write_object(const char *obj_path, const MachineCode *mc);

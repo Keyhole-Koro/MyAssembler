@@ -96,7 +96,7 @@ static void assemble_tree(const char *root, const char *current) {
         }
         snprintf(bin_path, bin_path_len, "tests/outputs/%s.bin", stem);
 
-        MachineCode mc = assembler(path, bin_path);
+        MachineCode mc = assembler(path, NULL);
 
         FILE *out = fopen(bin_path, "wb");
         if (!out) {
@@ -126,10 +126,9 @@ void test_all_samples(void) {
 void test_dependency_file_uses_import_from_path(void) {
     ensure_output_dir();
     const char *source = "tests/succeed/function/importFrom_main.masm";
-    const char *binary = "tests/outputs/importFrom_main_dep_test.bin";
     const char *depfile = "tests/outputs/importFrom_main_dep_test.deps";
 
-    MachineCode mc = assembler(source, binary);
+    MachineCode mc = assembler(source, NULL);
     TEST_ASSERT_TRUE(write_dependency_file(depfile, source));
 
     char helper[PATH_MAX];
@@ -167,7 +166,7 @@ static MachineCode assemble_source(const char *name, const char *source) {
     char source_path[PATH_MAX];
     char binary_path[PATH_MAX];
     write_source(name, source, source_path, binary_path);
-    return assembler(source_path, binary_path);
+    return assembler(source_path, NULL);
 }
 
 // Assembling `source` must stop with an error saying `message` -- exit
@@ -184,7 +183,7 @@ static void assert_rejected(const char *name, const char *source, const char *me
     TEST_ASSERT_TRUE(child >= 0);
     if (child == 0) {
         if (!freopen(error_path, "w", stderr)) _exit(2);
-        assembler(source_path, binary_path);
+        assembler(source_path, NULL);
         _exit(0);
     }
     int status = 0;
@@ -363,7 +362,7 @@ static unsigned char *read_whole_file(const char *path, size_t *size) {
 //       --obj tests/golden/objectLayout.mobj
 void test_object_matches_golden(void) {
     ensure_output_dir();
-    MachineCode mc = assembler("tests/golden/objectLayout.masm", "tests/outputs/objectLayout.mbin");
+    MachineCode mc = assembler("tests/golden/objectLayout.masm", NULL);
     write_object("tests/outputs/objectLayout.mobj", &mc);
 
     size_t expected_size = 0;

@@ -32,7 +32,7 @@ Token *_lexer(const char *file_path) {
     return head;
 }
 
-MachineCode assembler(const char *file_path, const char *output_path) {
+MachineCode assembler(const char *file_path, const char *report_path) {
     parser_set_source_file(file_path);
     Token *tokens = _lexer(file_path);
     if (!tokens) {
@@ -42,11 +42,9 @@ MachineCode assembler(const char *file_path, const char *output_path) {
 
     AsmBlock *parsed = parser(tokens);
 
-    // The debug report goes beside output_path, named <input-stem>_asm.txt.
-    char stem[256];
-    path_stem(file_path, stem, sizeof(stem));
-    char report_path[1024];
-    path_beside(output_path, stem, "_asm.txt", report_path, sizeof(report_path));
+    // Without a report path nothing is written: the report runs to several
+    // times the size of the source, and a system build assembles hundreds of
+    // files.
     write_debug_report(report_path, tokens, parsed);
 
     size_t import_count = 0;

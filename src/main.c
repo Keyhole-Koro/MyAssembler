@@ -51,7 +51,7 @@ static void write_hex_dump(const char *bin_path, const char *custom_path, const 
 
 int main(int argc, char *argv[]) {
     if (argc < 3) {
-        fprintf(stderr, "Usage: %s <input.asm> <output.bin> [hexdump.txt] [--obj <output.obj>] [--depfile <path>]\n", argv[0]);
+        fprintf(stderr, "Usage: %s <input.asm> <output.bin> [hexdump.txt] [--obj <output.obj>] [--depfile <path>] [--report]\n", argv[0]);
         return 1;
     }
     const char *input_path = argv[1];
@@ -59,9 +59,12 @@ int main(int argc, char *argv[]) {
     const char *hexdump_path = NULL;
     const char *obj_path = NULL;
     const char *depfile_path = NULL;
+    int report = 0;
 
     for (int i = 3; i < argc; ++i) {
-        if (strcmp(argv[i], "--obj") == 0 && i + 1 < argc) {
+        if (strcmp(argv[i], "--report") == 0) {
+            report = 1;
+        } else if (strcmp(argv[i], "--obj") == 0 && i + 1 < argc) {
             obj_path = argv[i + 1];
             ++i;
         } else if (strcmp(argv[i], "--depfile") == 0 && i + 1 < argc) {
@@ -78,7 +81,15 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    MachineCode mc = assembler(input_path, output_path);
+    // --report writes the debug report beside the output, named
+    // <input-stem>_asm.txt, and the hex dump.
+    char report_path[1024];
+    if (report) {
+        char stem[256];
+        path_stem(input_path, stem, sizeof(stem));
+        path_beside(output_path, stem, "_asm.txt", report_path, sizeof(report_path));
+    }
+    MachineCode mc = assembler(input_path, report ? report_path : NULL);
 
     FILE *out = fopen(output_path, "wb");
     if (!out) {
@@ -90,9 +101,11 @@ int main(int argc, char *argv[]) {
     fwrite(mc.code, 1, mc.size, out);
     fclose(out);
 
-    // Also write a hex dump. If a path is provided, use it; otherwise default
-    // to <output-dir>/<output-stem>.txt (e.g., MyTester/outputs/<stem>.txt).
-    write_hex_dump(output_path, hexdump_path, mc.code, mc.size);
+    // The hex dump goes to the path given after the output or, under
+    // --report, to <output-dir>/<output-stem>.txt.
+    if (hexdump_path || report) {
+        write_hex_dump(output_path, hexdump_path, mc.code, mc.size);
+    }
 
     // Optionally emit .obj for linker use
     if (obj_path) {
