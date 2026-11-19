@@ -364,7 +364,7 @@ static unsigned char *read_whole_file(const char *path, size_t *size) {
 void test_object_matches_golden(void) {
     ensure_output_dir();
     MachineCode mc = assembler("tests/golden/objectLayout.masm", NULL);
-    write_object("tests/outputs/objectLayout.mobj", &mc);
+    TEST_ASSERT_TRUE(write_object("tests/outputs/objectLayout.mobj", &mc));
 
     size_t expected_size = 0;
     size_t actual_size = 0;
@@ -377,6 +377,18 @@ void test_object_matches_golden(void) {
 
     free(expected);
     free(actual);
+    free(mc.code);
+}
+
+// An object that cannot be written is a failure the caller hears of: a
+// directory that is not there, or a device that is full.
+void test_write_object_reports_failure(void) {
+    ensure_output_dir();
+    MachineCode mc = assembler("tests/golden/objectLayout.masm", NULL);
+    TEST_ASSERT_FALSE(write_object("tests/outputs/no-such-directory/objectLayout.mobj", &mc));
+    if (access("/dev/full", W_OK) == 0) {
+        TEST_ASSERT_FALSE(write_object("/dev/full", &mc));
+    }
     free(mc.code);
 }
 
@@ -423,7 +435,7 @@ void test_long_private_labels_keep_distinct_names(void) {
 
     // The object holds the names whole.
     ensure_output_dir();
-    write_object("tests/outputs/longPrivateLabels.mobj", &mc);
+    TEST_ASSERT_TRUE(write_object("tests/outputs/longPrivateLabels.mobj", &mc));
     size_t size = 0;
     unsigned char *object = read_whole_file("tests/outputs/longPrivateLabels.mobj", &size);
     TEST_ASSERT_NOT_NULL(object);
@@ -542,6 +554,7 @@ int main(void) {
     RUN_TEST(test_all_samples);
     RUN_TEST(test_dependency_file_uses_import_from_path);
     RUN_TEST(test_object_matches_golden);
+    RUN_TEST(test_write_object_reports_failure);
     RUN_TEST(test_label_on_last_line_without_newline);
     RUN_TEST(test_operand_on_last_line_without_newline);
     RUN_TEST(test_shared_label_is_private_and_named);

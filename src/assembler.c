@@ -175,13 +175,19 @@ int write_dependency_file(const char *depfile_path, const char *file_path) {
     return ok;
 }
 
-void write_object(const char *obj_path, const MachineCode *mc) {
-    if (!obj_path || !mc) return;
+// Write `size` bytes; 1 if all were written.
+static int write_bytes(FILE *f, const void *bytes, size_t size) {
+    return size == 0 || fwrite(bytes, 1, size, f) == size;
+}
+
+int write_object(const char *obj_path, const MachineCode *mc) {
+    if (!obj_path || !mc) return 0;
     FILE *f = fopen(obj_path, "wb");
     if (!f) {
         perror("Failed to open .obj file");
-        return;
+        return 0;
     }
+    int ok = 1;
 
     struct FileHeader hdr = {0};
     hdr.magic = LINKER_MAGIC;
@@ -191,16 +197,16 @@ void write_object(const char *obj_path, const MachineCode *mc) {
     hdr.reloc_count = (uint32_t)mc->reloc_count;
     hdr.collect_count = (uint32_t)mc->collect_count;
     hdr.collect_size = (uint32_t)mc->blob_size;
-    fwrite(&hdr, sizeof(hdr), 1, f);
+    ok &= write_bytes(f, &hdr, sizeof(hdr));
 
     // text section
-    fwrite(mc->code, 1, mc->size, f);
+    ok &= write_bytes(f, mc->code, mc->size);
 
     // data section
-    if (mc->data_size > 0) fwrite(mc->data, 1, mc->data_size, f);
+    ok &= write_bytes(f, mc->data, mc->data_size);
 
     // collected-section blob
-    if (mc->blob_size > 0) fwrite(mc->blob, 1, mc->blob_size, f);
+    ok &= write_bytes(f, mc->blob, mc->blob_size);
 
     // symbols
     for (size_t i = 0; i < mc->symbol_count; ++i) {
@@ -210,7 +216,7 @@ void write_object(const char *obj_path, const MachineCode *mc) {
         se.type = src->type;
         se.section = src->section;
         se.offset = src->offset;
-        fwrite(&se, sizeof(se), 1, f);
+        ok &= write_bytes(f, &se, sizeof(se));
     }
 
     // relocs
@@ -221,7 +227,7 @@ void write_object(const char *obj_path, const MachineCode *mc) {
         strncpy(re.symbol_name, src->symbol_name ? src->symbol_name : "", sizeof(re.symbol_name) - 1);
         re.type = src->type;
         re.section = src->section;
-        fwrite(&re, sizeof(re), 1, f);
+        ok &= write_bytes(f, &re, sizeof(re));
     }
 
     // collected-section chunks
@@ -231,7 +237,7 @@ void write_object(const char *obj_path, const MachineCode *mc) {
         strncpy(ce.name, src->name ? src->name : "", sizeof(ce.name) - 1);
         ce.offset = src->offset;
         ce.size = src->size;
-        fwrite(&ce, sizeof(ce), 1, f);
+        ok &= write_bytes(f, &ce, sizeof(ce));
     }
 
     // debug trailer, for sources that carry `.func`/`.loc`/`.cost`
@@ -241,19 +247,21 @@ void write_object(const char *obj_path, const MachineCode *mc) {
         dh.string_size = (uint32_t)mc->debug.string_size;
         dh.func_count = (uint32_t)mc->debug.func_count;
         dh.row_count = (uint32_t)mc->debug.row_count;
-        fwrite(&dh, sizeof(dh), 1, f);
-        fwrite(mc->debug.strings, 1, mc->debug.string_size, f);
+        ok &= write_bytes(f, &dh, sizeof(dh));
+        ok &= write_bytes(f, mc->debug.strings, mc->debug.string_size);
         for (size_t i = 0; i < mc->debug.func_count; ++i) {
             const ObjDebugFunc *src = &mc->debug.funcs[i];
             struct DebugFunc df = {src->offset, src->name, src->file};
-            fwrite(&df, sizeof(df), 1, f);
+            ok &= write_bytes(f, &df, sizeof(df));
         }
         for (size_t i = 0; i < mc->debug.row_count; ++i) {
             const ObjDebugRow *src = &mc->debug.rows[i];
             struct DebugRow dr = {src->offset, src->file, src->line, src->cost};
-            fwrite(&dr, sizeof(dr), 1, f);
+            ok &= write_bytes(f, &dr, sizeof(dr));
         }
     }
 
-    fclose(f);
+    if (fclose(f) != 0) ok = 0;
+    if (!ok) fprintf(stderr, "Failed to write .obj file: %s\n", obj_path);
+    return ok;
 }

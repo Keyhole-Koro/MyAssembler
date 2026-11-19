@@ -11,7 +11,8 @@
 MachineCode assembler(const char *file_path, const char *report_path);
 
 // Optional: write a MyCCLinker-compatible .obj file from assembled output.
-void write_object(const char *obj_path, const MachineCode *mc);
+// Returns 1 on success, 0 if the file could not be opened or written.
+int write_object(const char *obj_path, const MachineCode *mc);
 
 // Write direct source dependencies recorded by assembly `import ... from` lines.
 // Paths are canonicalized relative to file_path.
