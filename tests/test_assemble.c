@@ -357,8 +357,9 @@ static unsigned char *read_whole_file(const char *path, size_t *size) {
 }
 
 // The object written for tests/golden/objectLayout.masm must not change by a
-// byte unless the object format does. After such a change, regenerate it:
-//   ./build/myas tests/golden/objectLayout.masm tests/outputs/objectLayout.mbin \
+// byte unless the object format does. After such a change, regenerate it
+// with this one command:
+//   ./build/myas tests/golden/objectLayout.masm tests/outputs/objectLayout.mbin
 //       --obj tests/golden/objectLayout.mobj
 void test_object_matches_golden(void) {
     ensure_output_dir();
@@ -379,6 +380,22 @@ void test_object_matches_golden(void) {
     free(mc.code);
 }
 
+// A byte outside ASCII (UTF-8 text) may sit in a comment or a string, and
+// is an error anywhere else.
+void test_non_ascii_bytes_only_in_comments_and_strings(void) {
+    MachineCode mc = assemble_source("nonAsciiText",
+                                     "__START__: ; caf\xC3\xA9\n"
+                                     "  .func \"caf\xC3\xA9\" \"src/\xC3\xA9.mln\"\n"
+                                     "  halt ; \xE2\x80\x94\n");
+    const uint8_t halt[] = {0xFC, 0x00, 0x00, 0x00};
+    TEST_ASSERT_EQUAL_size_t(sizeof(halt), mc.size);
+    TEST_ASSERT_EQUAL_HEX8_ARRAY(halt, mc.code, sizeof(halt));
+    free(mc.code);
+
+    assert_rejected("nonAsciiCode", "__START__:\n  halt \xC3\xA9\n",
+                    "Unknown character at line 2 col 8");
+}
+
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_all_samples);
@@ -390,5 +407,6 @@ int main(void) {
     RUN_TEST(test_missing_operand_at_end_of_file_is_an_error);
     RUN_TEST(test_negative_number_ends_at_its_last_digit);
     RUN_TEST(test_negative_numbers_in_operands_and_lists);
+    RUN_TEST(test_non_ascii_bytes_only_in_comments_and_strings);
     return UNITY_END();
 }
