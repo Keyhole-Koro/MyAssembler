@@ -442,6 +442,40 @@ void test_long_private_labels_keep_distinct_names(void) {
     free(mc.code);
 }
 
+// An immediate the instruction has no room for is an error at its line,
+// not another value, and not a crash.
+void test_out_of_range_immediates_are_rejected(void) {
+    assert_rejected("immediateTooWide", "__START__:\n  movi r1, 0x100000005\n",
+                    ":2:12: error: Immediate 4294967301 is out of range");
+    assert_rejected("immediateTooLarge", "__START__:\n  movi r1, 0x200000\n",
+                    ":2:12: error: Immediate 2097152 is out of range");
+    assert_rejected("immediateTooNegative", "__START__:\n  movi r1, -3000000\n",
+                    ":2:12: error: Immediate -3000000 is out of range");
+    assert_rejected("immediateJustTooNegative", "__START__:\n  movi r1, -1048577\n",
+                    ":2:12: error: Immediate -1048577 is out of range");
+    assert_rejected("immediateTooWideJump", "__START__:\n  jmp 99999999\n",
+                    ":2:7: error: Immediate 99999999 is out of range");
+}
+
+// The widest immediates that fit encode as they always have.
+void test_immediates_at_the_ends_of_their_range(void) {
+    MachineCode mc = assemble_source("immediateEnds",
+                                     "__START__:\n"
+                                     "  movi r1, 0x1FFFFF\n"
+                                     "  movi r1, -1048576\n"
+                                     "  movi r1, 0\n"
+                                     "  jmp 0x3FFFFFF\n");
+    const uint8_t expected[] = {
+        0x08, 0x3F, 0xFF, 0xFF, // movi r1, 0x1FFFFF
+        0x08, 0x30, 0x00, 0x00, // movi r1, -1048576: 0x100000 in 21 bits
+        0x08, 0x20, 0x00, 0x00, // movi r1, 0
+        0x37, 0xFF, 0xFF, 0xFF, // jmp 0x3FFFFFF
+    };
+    TEST_ASSERT_EQUAL_size_t(sizeof(expected), mc.size);
+    TEST_ASSERT_EQUAL_HEX8_ARRAY(expected, mc.code, sizeof(expected));
+    free(mc.code);
+}
+
 // A byte outside ASCII (UTF-8 text) may sit in a comment or a string, and
 // is an error anywhere else.
 void test_non_ascii_bytes_only_in_comments_and_strings(void) {
@@ -471,5 +505,7 @@ int main(void) {
     RUN_TEST(test_negative_numbers_in_operands_and_lists);
     RUN_TEST(test_non_ascii_bytes_only_in_comments_and_strings);
     RUN_TEST(test_long_private_labels_keep_distinct_names);
+    RUN_TEST(test_out_of_range_immediates_are_rejected);
+    RUN_TEST(test_immediates_at_the_ends_of_their_range);
     return UNITY_END();
 }
