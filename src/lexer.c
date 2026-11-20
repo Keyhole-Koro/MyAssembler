@@ -23,7 +23,7 @@ bool is_hex(const char *ptr) {
     }
 
     // Ensure at least one hex digit follows
-    return isxdigit(ptr[2]);
+    return isxdigit((unsigned char)ptr[2]);
 }
 
 bool is_hex_digit(char c) {
@@ -85,7 +85,7 @@ bool is_register(const char *reg, char *buffer) {
         size_t len = strlen(register_names[i]);
         if (strncmp(reg, register_names[i], len) == 0) {
             char next = reg[len];
-            if (next == '\0' || (!isalnum(next) && next != '_')) {
+            if (next == '\0' || (!isalnum((unsigned char)next) && next != '_')) {
                 strncpy(buffer, register_names[i], len + 1);
                 return true;
             }
@@ -125,7 +125,7 @@ Token *lexer(const char *ptr, Token **head, Token *cur, int line) {
             continue;
         }
 
-        if (isspace(*ptr)) {
+        if (isspace((unsigned char)*ptr)) {
             col++;
             ptr++;
             continue;

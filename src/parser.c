@@ -102,9 +102,12 @@ static void print_line_snippet(const char *file, int line, int col) {
     if (!file || line <= 0) return;
     FILE *fp = fopen(file, "r");
     if (!fp) return;
-    char buf[512];
+    // Read each line whole, as the lexer does, so that a long line counts
+    // as one.
+    char *buf = NULL;
+    size_t capacity = 0;
     int cur_line = 1;
-    while (fgets(buf, sizeof(buf), fp)) {
+    while (getline(&buf, &capacity, fp) != -1) {
         if (cur_line == line) {
             size_t len = strlen(buf);
             while (len > 0 && (buf[len-1] == '\n' || buf[len-1] == '\r')) buf[--len] = '\0';
@@ -114,6 +117,7 @@ static void print_line_snippet(const char *file, int line, int col) {
         }
         cur_line++;
     }
+    free(buf);
     fclose(fp);
 }
 
@@ -422,6 +426,19 @@ AsmInstr *instrRegRegReg(Token *opcode, Token *reg1, Token *reg2, Token *reg3) {
     return instrList;
 }
 
+// The value of a NUMBER or NEGATIVE_NUMBER token (the lexer writes a hex
+// number in decimal), which must lie in min..max: a value the instruction
+// has no room for is an error at the token, not a different value.
+static long long immediate_value(Token *tok, long long min, long long max) {
+    errno = 0;
+    char *end = NULL;
+    long long value = strtoll(tok->str, &end, 10);
+    if (errno == ERANGE || end == tok->str || *end != '\0' || value < min || value > max) {
+        ERROR(tok, "Immediate %s is out of range (%lld..%lld)", tok->str, min, max);
+    }
+    return value;
+}
+
 AsmInstr *instrRegImm21(Token *opcode, Token *reg1, Token *imm21) {
     AsmInstr *instrList = malloc(sizeof(AsmInstr));
     InstrRegImm21 *regImm21 = malloc(sizeof(InstrRegImm21));
@@ -429,15 +446,10 @@ AsmInstr *instrRegImm21(Token *opcode, Token *reg1, Token *imm21) {
     regImm21->opcode = mapOpcode(opcode->str);
     regImm21->reg1 = mapRegister(reg1->str);
 
-    if (imm21->type == NUMBER) {
-        regImm21->imm21 = atoi(imm21->str); // Convert immediate value to integer
-    }
-    else if (imm21->type == NEGATIVE_NUMBER) {
-        char signStr = imm21->str[0]; // Get the sign
-        assert(signStr == '-'); // Ensure it's a negative number
-        char *numStr = imm21->str + 1; // Skip the sign
-        regImm21->imm21 = (~atoi(numStr) + 1) & 0x1FFFFF; // Convert to negative integer
-    }
+    // 21 bits hold 0..0x1FFFFF, or a negative number down to -0x100000 in
+    // two's complement.
+    long long value = immediate_value(imm21, -0x100000LL, 0x1FFFFFLL);
+    regImm21->imm21 = (uint32_t)value & 0x1FFFFF;
     instrList->instruction = (Instruction *)regImm21;
     instrList->needs_fixup = false; // No fixup needed for immediate instructions
     instrList->next = NULL; // Initialize next pointer to NULL
@@ -523,7 +535,7 @@ AsmInstr *instrImm26(Token *opcode, Token *imm26) {
     InstrImm26 *imm26Instr = malloc(sizeof(InstrImm26));
     instrList->kind = INSTR_IMM26;
     imm26Instr->opcode = mapOpcode(opcode->str);
-    imm26Instr->imm26 = atoi(imm26->str); // Convert immediate value to integer
+    imm26Instr->imm26 = (uint32_t)immediate_value(imm26, 0, 0x3FFFFFFLL);
     instrList->instruction = (Instruction *)imm26Instr;
     instrList->needs_fixup = false; // No fixup needed for immediate instructions
     instrList->next = NULL; // Initialize next pointer to NULL

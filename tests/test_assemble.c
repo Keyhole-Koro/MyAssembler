@@ -357,13 +357,14 @@ static unsigned char *read_whole_file(const char *path, size_t *size) {
 }
 
 // The object written for tests/golden/objectLayout.masm must not change by a
-// byte unless the object format does. After such a change, regenerate it:
-//   ./build/myas tests/golden/objectLayout.masm tests/outputs/objectLayout.mbin \
+// byte unless the object format does. After such a change, regenerate it
+// with this one command:
+//   ./build/myas tests/golden/objectLayout.masm tests/outputs/objectLayout.mbin
 //       --obj tests/golden/objectLayout.mobj
 void test_object_matches_golden(void) {
     ensure_output_dir();
     MachineCode mc = assembler("tests/golden/objectLayout.masm", NULL);
-    write_object("tests/outputs/objectLayout.mobj", &mc);
+    TEST_ASSERT_TRUE(write_object("tests/outputs/objectLayout.mobj", &mc));
 
     size_t expected_size = 0;
     size_t actual_size = 0;
@@ -379,16 +380,193 @@ void test_object_matches_golden(void) {
     free(mc.code);
 }
 
+// An object that cannot be written is a failure the caller hears of: a
+// directory that is not there, or a device that is full.
+void test_write_object_reports_failure(void) {
+    ensure_output_dir();
+    MachineCode mc = assembler("tests/golden/objectLayout.masm", NULL);
+    TEST_ASSERT_FALSE(write_object("tests/outputs/no-such-directory/objectLayout.mobj", &mc));
+    if (access("/dev/full", W_OK) == 0) {
+        TEST_ASSERT_FALSE(write_object("/dev/full", &mc));
+    }
+    free(mc.code);
+}
+
+// Two private labels too long for the object's names, alike in their first
+// 70 bytes, keep names of their own there: each is cut short to leave room
+// for the `-[module:n]` that makes it private and unique, and each address
+// load is relocated against its own label.
+void test_long_private_labels_keep_distinct_names(void) {
+    char prefix[71];
+    memset(prefix, 'a', 70);
+    prefix[70] = '\0';
+    char source[1024];
+    snprintf(source, sizeof(source),
+             "__START__:\n"
+             "  movi r1, %s_one\n"
+             "  movi r2, %s_two\n"
+             "  halt\n"
+             "%s_one:\n"
+             "  halt\n"
+             "%s_two:\n"
+             "  halt\n",
+             prefix, prefix, prefix, prefix);
+    MachineCode mc = assemble_source("longPrivateLabels", source);
+
+    const ObjSymbol *one = NULL;
+    const ObjSymbol *two = NULL;
+    for (size_t i = 0; i < mc.symbol_count; i++) {
+        if (mc.symbols[i].offset == 20) one = &mc.symbols[i];
+        if (mc.symbols[i].offset == 24) two = &mc.symbols[i];
+    }
+    TEST_ASSERT_NOT_NULL(one);
+    TEST_ASSERT_NOT_NULL(two);
+    TEST_ASSERT_TRUE(strcmp(one->name, two->name) != 0);
+    TEST_ASSERT_NOT_NULL(strstr(one->name, PRIVATE_LABEL_MARK));
+    TEST_ASSERT_NOT_NULL(strstr(two->name, PRIVATE_LABEL_MARK));
+    TEST_ASSERT_TRUE(strlen(one->name) < sizeof(((struct SymbolEntry *)0)->name));
+    TEST_ASSERT_TRUE(strlen(two->name) < sizeof(((struct SymbolEntry *)0)->name));
+
+    TEST_ASSERT_EQUAL_size_t(4, mc.reloc_count);
+    TEST_ASSERT_EQUAL_STRING(one->name, mc.relocs[0].symbol_name);
+    TEST_ASSERT_EQUAL_STRING(one->name, mc.relocs[1].symbol_name);
+    TEST_ASSERT_EQUAL_STRING(two->name, mc.relocs[2].symbol_name);
+    TEST_ASSERT_EQUAL_STRING(two->name, mc.relocs[3].symbol_name);
+
+    // The object holds the names whole.
+    ensure_output_dir();
+    TEST_ASSERT_TRUE(write_object("tests/outputs/longPrivateLabels.mobj", &mc));
+    size_t size = 0;
+    unsigned char *object = read_whole_file("tests/outputs/longPrivateLabels.mobj", &size);
+    TEST_ASSERT_NOT_NULL(object);
+    struct FileHeader header;
+    TEST_ASSERT_TRUE(size >= sizeof(header));
+    memcpy(&header, object, sizeof(header));
+    size_t at = sizeof(header) + header.text_size + header.data_size + header.collect_size;
+    TEST_ASSERT_EQUAL_UINT32(mc.symbol_count, header.symtable_count);
+    TEST_ASSERT_TRUE(size >= at + header.symtable_count * sizeof(struct SymbolEntry));
+    for (size_t i = 0; i < header.symtable_count; i++) {
+        struct SymbolEntry entry;
+        memcpy(&entry, object + at + i * sizeof(entry), sizeof(entry));
+        TEST_ASSERT_EQUAL_STRING(mc.symbols[i].name, entry.name);
+    }
+    free(object);
+    free(mc.code);
+}
+
+// An immediate the instruction has no room for is an error at its line,
+// not another value, and not a crash.
+void test_out_of_range_immediates_are_rejected(void) {
+    assert_rejected("immediateTooWide", "__START__:\n  movi r1, 0x100000005\n",
+                    ":2:12: error: Immediate 4294967301 is out of range");
+    assert_rejected("immediateTooLarge", "__START__:\n  movi r1, 0x200000\n",
+                    ":2:12: error: Immediate 2097152 is out of range");
+    assert_rejected("immediateTooNegative", "__START__:\n  movi r1, -3000000\n",
+                    ":2:12: error: Immediate -3000000 is out of range");
+    assert_rejected("immediateJustTooNegative", "__START__:\n  movi r1, -1048577\n",
+                    ":2:12: error: Immediate -1048577 is out of range");
+    assert_rejected("immediateTooWideJump", "__START__:\n  jmp 99999999\n",
+                    ":2:7: error: Immediate 99999999 is out of range");
+}
+
+// The widest immediates that fit encode as they always have.
+void test_immediates_at_the_ends_of_their_range(void) {
+    MachineCode mc = assemble_source("immediateEnds",
+                                     "__START__:\n"
+                                     "  movi r1, 0x1FFFFF\n"
+                                     "  movi r1, -1048576\n"
+                                     "  movi r1, 0\n"
+                                     "  jmp 0x3FFFFFF\n");
+    const uint8_t expected[] = {
+        0x08, 0x3F, 0xFF, 0xFF, // movi r1, 0x1FFFFF
+        0x08, 0x30, 0x00, 0x00, // movi r1, -1048576: 0x100000 in 21 bits
+        0x08, 0x20, 0x00, 0x00, // movi r1, 0
+        0x37, 0xFF, 0xFF, 0xFF, // jmp 0x3FFFFFF
+    };
+    TEST_ASSERT_EQUAL_size_t(sizeof(expected), mc.size);
+    TEST_ASSERT_EQUAL_HEX8_ARRAY(expected, mc.code, sizeof(expected));
+    free(mc.code);
+}
+
+// `text` followed by `count` copies of `repeat`, then `tail`, in a new string.
+static char *repeated(const char *text, const char *repeat, size_t count, const char *tail) {
+    size_t length = strlen(text) + strlen(repeat) * count + strlen(tail);
+    char *source = malloc(length + 1);
+    TEST_ASSERT_NOT_NULL(source);
+    char *at = stpcpy(source, text);
+    for (size_t i = 0; i < count; i++) at = stpcpy(at, repeat);
+    strcpy(at, tail);
+    return source;
+}
+
+// A line is read whole, however long: a comment runs to the end of its
+// line, and the next line is the line after.
+void test_long_comment_line(void) {
+    char *source = repeated("; ", "x", 9000, "\n__START__:\n  halt\n");
+    MachineCode mc = assemble_source("longCommentLine", source);
+    const uint8_t halt[] = {0xFC, 0x00, 0x00, 0x00};
+    TEST_ASSERT_EQUAL_size_t(sizeof(halt), mc.size);
+    TEST_ASSERT_EQUAL_HEX8_ARRAY(halt, mc.code, sizeof(halt));
+    free(mc.code);
+    free(source);
+}
+
+// A number at byte 8189..8191 of a `.byte` line -- where an 8192-byte line
+// buffer used to split the line -- is one number.
+void test_long_byte_line(void) {
+    char *source = repeated("__START__:\n  halt\ndata:\n  .byte  ", "1,", 4090, "123,7\n");
+    MachineCode mc = assemble_source("longByteLine", source);
+    TEST_ASSERT_EQUAL_size_t(4 + 4092, mc.size);
+    for (size_t i = 4; i < 4 + 4090; i++) TEST_ASSERT_EQUAL_HEX8(1, mc.code[i]);
+    TEST_ASSERT_EQUAL_HEX8(123, mc.code[4 + 4090]);
+    TEST_ASSERT_EQUAL_HEX8(7, mc.code[4 + 4091]);
+    free(mc.code);
+    free(source);
+}
+
+// An error after a long line is reported at its own line, and shows it.
+void test_error_after_long_line_names_its_line(void) {
+    char *source = repeated("; ", "x", 9000, "\n__START__:\n  movi r1, 0x200000\n");
+    assert_rejected("errorAfterLongLine", source,
+                    ":3:12: error: Immediate 2097152 is out of range (-1048576..2097151)\n"
+                    "    movi r1, 0x200000\n");
+    free(source);
+}
+
+// A byte outside ASCII (UTF-8 text) may sit in a comment or a string, and
+// is an error anywhere else.
+void test_non_ascii_bytes_only_in_comments_and_strings(void) {
+    MachineCode mc = assemble_source("nonAsciiText",
+                                     "__START__: ; caf\xC3\xA9\n"
+                                     "  .func \"caf\xC3\xA9\" \"src/\xC3\xA9.mln\"\n"
+                                     "  halt ; \xE2\x80\x94\n");
+    const uint8_t halt[] = {0xFC, 0x00, 0x00, 0x00};
+    TEST_ASSERT_EQUAL_size_t(sizeof(halt), mc.size);
+    TEST_ASSERT_EQUAL_HEX8_ARRAY(halt, mc.code, sizeof(halt));
+    free(mc.code);
+
+    assert_rejected("nonAsciiCode", "__START__:\n  halt \xC3\xA9\n",
+                    "Unknown character at line 2 col 8");
+}
+
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_all_samples);
     RUN_TEST(test_dependency_file_uses_import_from_path);
     RUN_TEST(test_object_matches_golden);
+    RUN_TEST(test_write_object_reports_failure);
     RUN_TEST(test_label_on_last_line_without_newline);
     RUN_TEST(test_operand_on_last_line_without_newline);
     RUN_TEST(test_shared_label_is_private_and_named);
     RUN_TEST(test_missing_operand_at_end_of_file_is_an_error);
     RUN_TEST(test_negative_number_ends_at_its_last_digit);
     RUN_TEST(test_negative_numbers_in_operands_and_lists);
+    RUN_TEST(test_non_ascii_bytes_only_in_comments_and_strings);
+    RUN_TEST(test_long_private_labels_keep_distinct_names);
+    RUN_TEST(test_out_of_range_immediates_are_rejected);
+    RUN_TEST(test_immediates_at_the_ends_of_their_range);
+    RUN_TEST(test_long_comment_line);
+    RUN_TEST(test_long_byte_line);
+    RUN_TEST(test_error_after_long_line_names_its_line);
     return UNITY_END();
 }
