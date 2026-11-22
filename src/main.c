@@ -98,8 +98,9 @@ int main(int argc, char *argv[]) {
         exit(EXIT_FAILURE);
     }
 
-    fwrite(mc.code, 1, mc.size, out);
-    fclose(out);
+    int ok = mc.size == 0 || fwrite(mc.code, 1, mc.size, out) == mc.size;
+    if (fclose(out) != 0) ok = 0;
+    if (!ok) fprintf(stderr, "Failed to write output file: %s\n", output_path);
 
     // The hex dump goes to the path given after the output or, under
     // --report, to <output-dir>/<output-stem>.txt.
@@ -108,11 +109,9 @@ int main(int argc, char *argv[]) {
     }
 
     // Optionally emit .obj for linker use
-    if (obj_path) {
-        write_object(obj_path, &mc);
-    }
+    if (obj_path && !write_object(obj_path, &mc)) ok = 0;
 
-    int depfile_ok = !depfile_path || write_dependency_file(depfile_path, input_path);
+    if (depfile_path && !write_dependency_file(depfile_path, input_path)) ok = 0;
 
     free(mc.code);
     for (size_t i = 0; i < mc.symbol_count; ++i) free(mc.symbols[i].name);
@@ -120,5 +119,5 @@ int main(int argc, char *argv[]) {
     for (size_t i = 0; i < mc.reloc_count; ++i) free(mc.relocs[i].symbol_name);
     free(mc.relocs);
 
-    return depfile_ok ? 0 : 1;
+    return ok ? 0 : 1;
 }

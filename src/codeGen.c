@@ -445,6 +445,27 @@ static void add_collect(CodeGen *cg, char *name, uint32_t offset, uint32_t size)
     cg->collect_count++;
 }
 
+// The longest name an object's symbol or relocation entry holds.
+#define OBJ_NAME_MAX (sizeof(((struct SymbolEntry *)0)->name) - 1)
+_Static_assert(sizeof(((struct SymbolEntry *)0)->name) == sizeof(((struct RelocEntry *)0)->symbol_name),
+               "a private name must fit a symbol entry and a relocation entry alike");
+
+// Write `label`'s private name, PRIVATE_LABEL_FORMAT, into `out`. The object
+// keeps OBJ_NAME_MAX bytes of a name, so a long label is cut short to leave
+// room for the whole `-[module:n]` suffix: the mark tells the linker the name
+// is private, and n keeps it apart from the file's other private names.
+static void private_label_name(char *out, size_t out_size, const char *label,
+                               const char *module_name, unsigned n) {
+    char suffix[OBJ_NAME_MAX + 1];
+    int suffix_length = snprintf(suffix, sizeof(suffix), PRIVATE_LABEL_FORMAT, "", module_name, n);
+    // The module name is at most 31 bytes and n 10 digits, which leaves a
+    // good part of the label.
+    assert(suffix_length > 0 && (size_t)suffix_length < OBJ_NAME_MAX);
+    size_t keep = strlen(label);
+    if (keep > OBJ_NAME_MAX - (size_t)suffix_length) keep = OBJ_NAME_MAX - (size_t)suffix_length;
+    snprintf(out, out_size, "%.*s%s", (int)keep, label, suffix);
+}
+
 // Put a block's label at `at` in the block's section, and in the symbol
 // table under its own name if it is public -- an `f_` function, __START__,
 // or exported -- or else under a name private to this object
@@ -455,8 +476,8 @@ static void define_label(CodeGen *cg, const AsmBlock *block, uint32_t at) {
         labelsymbolmap_put(&cg->symbol_names, block->label, block->label);
         symbolvec_push(&cg->symbols, block->label, SYMBOL_DEFINED, block->section, at);
     } else {
-        char unique_name[96];
-        snprintf(unique_name, sizeof(unique_name), PRIVATE_LABEL_FORMAT, block->label, cg->module_name, cg->next_private++);
+        char unique_name[OBJ_NAME_MAX + 1];
+        private_label_name(unique_name, sizeof(unique_name), block->label, cg->module_name, cg->next_private++);
         labelsymbolmap_put(&cg->symbol_names, block->label, unique_name);
         symbolvec_push(&cg->symbols, unique_name, SYMBOL_DEFINED, block->section, at);
         // A shared label is also there under its own name, for other objects.
