@@ -19,6 +19,8 @@ TESTCASES = [
     ("trailingComment", ["succeed/core/trailingComment_main.masm", "succeed/core/trailingComment_empty.masm"], "R1", 7),
     ("importFrom", ["succeed/function/importFrom_main.masm", "succeed/function/importFrom_helper.masm"], "R1", 11),
     ("exportFrom", ["succeed/function/exportFrom_main.masm", "succeed/function/exportFrom_helper.masm"], "R1", 11),
+    # A function called `from`: `from` is a keyword only before an import's path.
+    ("labelNamedFrom", ["succeed/function/labelNamedFrom_main.masm", "succeed/function/labelNamedFrom_helper.masm"], "R1", 42),
     ("localDataReloc", ["succeed/memory/localDataReloc_main.masm", "succeed/memory/localDataReloc_helper.masm"], "R1", 77),
     ("localLabelCollision", ["succeed/memory/localLabelCollision_main.masm", "succeed/memory/localLabelCollision_a.masm", "succeed/memory/localLabelCollision_b.masm"], "R1", 42),
 ]

@@ -250,6 +250,41 @@ void test_shared_label_is_private_and_named(void) {
     free(mc.code);
 }
 
+// `from` is a keyword only right after an import list (`import a from
+// "path"`). Anywhere else it is a label, as a MyLang function called `from`
+// becomes one: shared, defined, called and loaded by that name.
+void test_from_is_a_label_outside_an_import(void) {
+    MachineCode mc = assemble_source("labelNamedFrom",
+        ".shared from\n__START__:\n  call from\n  movi r1, from\n  halt\nfrom:\n  mov pc, lr\n");
+    const ObjSymbol *shared = NULL;
+    const ObjSymbol *private_name = find_symbol(&mc, "from");
+    for (size_t i = 0; i < mc.symbol_count; i++) {
+        if (strcmp(mc.symbols[i].name, "from") == 0) shared = &mc.symbols[i];
+    }
+    TEST_ASSERT_NOT_NULL(shared);
+    TEST_ASSERT_EQUAL_UINT32(SYMBOL_SHARED, shared->type);
+    // call, then movi as lui and addis, then halt: `from` is at 16.
+    TEST_ASSERT_EQUAL_UINT32(16, shared->offset);
+    TEST_ASSERT_NOT_NULL(private_name);
+    TEST_ASSERT_EQUAL_UINT32(16, private_name->offset);
+    free(mc.code);
+}
+
+// An import list may name `from` as well, with or without a path after it.
+void test_import_list_may_name_from(void) {
+    MachineCode mc = assemble_source("importNamedFrom",
+        "import from\nimport { a, from } from \"importNamedFrom_dep.masm\"\n"
+        "__START__:\n  call from\n  call a\n  halt\n");
+    TEST_ASSERT_EQUAL_size_t(2, mc.reloc_count);
+    TEST_ASSERT_EQUAL_STRING("from", mc.relocs[0].symbol_name);
+    TEST_ASSERT_EQUAL_STRING("a", mc.relocs[1].symbol_name);
+    size_t path_count = 0;
+    const char **paths = parser_get_import_paths(&path_count);
+    TEST_ASSERT_EQUAL_size_t(1, path_count);
+    TEST_ASSERT_EQUAL_STRING("importNamedFrom_dep.masm", paths[0]);
+    free(mc.code);
+}
+
 // A label operand may be the file's last token too.
 void test_operand_on_last_line_without_newline(void) {
     MachineCode jump = assemble_source("jumpAtEnd", "__START__:\n  jmp __START__");
@@ -558,6 +593,8 @@ int main(void) {
     RUN_TEST(test_label_on_last_line_without_newline);
     RUN_TEST(test_operand_on_last_line_without_newline);
     RUN_TEST(test_shared_label_is_private_and_named);
+    RUN_TEST(test_from_is_a_label_outside_an_import);
+    RUN_TEST(test_import_list_may_name_from);
     RUN_TEST(test_missing_operand_at_end_of_file_is_an_error);
     RUN_TEST(test_negative_number_ends_at_its_last_digit);
     RUN_TEST(test_negative_numbers_in_operands_and_lists);

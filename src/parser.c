@@ -284,7 +284,9 @@ static void parse_import(Token **cur) {
         consume(cur);
     }
 
-    if (*cur && (*cur)->type == FROM) {
+    // `from "path"` after the list. Anywhere else `from` is an ordinary
+    // label, the list's own names included (`import from`).
+    if (*cur && (*cur)->type == LABEL && strcmp((*cur)->str, "from") == 0) {
         consume(cur);
         if (!*cur || (*cur)->type != STRING_LITERAL) {
             ERROR(*cur, "Expected file path string after from");

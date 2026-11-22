@@ -250,12 +250,13 @@ Token *lexer(const char *ptr, Token **head, Token *cur, int line) {
 
         if (is_alphaOrUnderbar(*ptr)) {
             read_identifier(&ptr, buffer, &col);
+            // `from` is a label like any other name: only parse_import
+            // reads it as a keyword, after an import list. A MyLang
+            // function may be called `from`.
             if (strcmp(buffer, "import") == 0) {
                 cur = create_token(cur, IMPORT, buffer, tok_line, tok_col);
             } else if (strcmp(buffer, "export") == 0) {
                 cur = create_token(cur, EXPORT, buffer, tok_line, tok_col);
-            } else if (strcmp(buffer, "from") == 0) {
-                cur = create_token(cur, FROM, buffer, tok_line, tok_col);
             } else {
                 cur = create_token(cur, LABEL, buffer, tok_line, tok_col);
             }

@@ -1,0 +1,6 @@
+import { from } from "labelNamedFrom_helper.masm"
+
+__START__:
+  movi r5, 40
+  call from
+  halt
